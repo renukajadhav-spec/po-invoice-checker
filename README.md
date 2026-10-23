@@ -29,8 +29,8 @@ Fake test documents are in [`samples/`](samples/): `po-1001.pdf` + `invoice-501.
 ## The 6 checks
 | Check | Passes when |
 |---|---|
-| GSTIN | Vendor name and GSTIN are the same on the PO and the invoice. ⚠ Note (does not fail): GSTIN check digit is wrong |
-| Company details | Buyer name and GSTIN are the same on the PO and the invoice. ⚠ Note (does not fail): buyer GSTIN is not valid |
+| GSTIN | Vendor name and GSTIN are the same on the PO and the invoice |
+| Company details | Buyer name and GSTIN are the same on the PO and the invoice |
 | GST rate | Same rate as the PO, and the rate is valid on the invoice date |
 | GST calculation | Amount × rate = tax; CGST + SGST for the same state, IGST for another state (₹1 rounding allowed) |
 | Qty × rate | Qty × rate = amount on every line |

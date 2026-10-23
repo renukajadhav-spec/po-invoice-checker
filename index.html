@@ -118,9 +118,7 @@
   th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
   td.check { font-weight: 600; min-width: 150px; }
   td.check .why { font-weight: 400; font-size: 12px; color: var(--muted); margin-top: 3px; }
-  tr.fail td.check .why { color: var(--no); }
-  td.check .why.warn, tr.fail td.check .why.warn { color: var(--warn); }
-  .pass { font-weight: 700; white-space: nowrap; }
+  tr.fail td.check .why { color: var(--no); }  .pass { font-weight: 700; white-space: nowrap; }
   .pass.ok { color: var(--ok); }
   .pass.no { color: var(--no); }
   details summary { cursor: pointer; font-weight: 600; }
@@ -310,17 +308,6 @@ function showDate(iso) {
   return `${+d} ${MONTHS[m - 1][0] + MONTHS[m - 1].slice(1).toLowerCase()} ${y}`;
 }
 
-// GSTIN: 2-digit state + PAN (5 letters, 4 digits, 1 letter) + entity + Z + check digit
-const GSTIN_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-function gstinValid(g) {
-  if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(g)) return false;
-  let sum = 0;
-  for (let i = 0; i < 14; i++) {
-    const p = GSTIN_CHARS.indexOf(g[i]) * (i % 2 ? 2 : 1);
-    sum += Math.floor(p / 36) + (p % 36);
-  }
-  return GSTIN_CHARS[(36 - (sum % 36)) % 36] === g[14];
-}
 
 // ---------- Reading CSV files ----------
 function parseCSV(text) {
@@ -819,14 +806,13 @@ function runChecks(po, inv) {
   // Names compare without dots, commas and extra spaces ("Pvt. Ltd." = "Pvt Ltd")
   const sameName = (a, b) => norm(a).replace(/[.,]/g, "").replace(/\s+/g, " ") === norm(b).replace(/[.,]/g, "").replace(/\s+/g, " ");
 
-  // 1. GSTIN: pass when the invoice vendor matches the PO vendor; master-data findings are notes only
+  // 1. GSTIN: pass when the invoice vendor matches the PO vendor
   {
-    const issues = [], notes = [];
+    const issues = [];
     if (I.vendor_gstin !== P.vendor_gstin) issues.push("vendor GSTIN on the invoice is different from the PO");
     if (!sameName(I.vendor_name, P.vendor_name)) issues.push("vendor name on the invoice is different from the PO");
-    if (!gstinValid(I.vendor_gstin)) notes.push("this GSTIN is not valid (format or check digit), so confirm it with the vendor");
     results.push({
-      name: "GSTIN", issues, notes,
+      name: "GSTIN", issues,
       okText: "Vendor name and GSTIN are the same on the PO and the invoice",
       po: [P.vendor_name, P.vendor_gstin],
       inv: [I.vendor_name, I.vendor_gstin]
@@ -835,12 +821,11 @@ function runChecks(po, inv) {
 
   // 2. Company details: pass when the invoice is billed to the same buyer as the PO
   {
-    const issues = [], notes = [];
+    const issues = [];
     if (!sameName(I.buyer_name, P.buyer_name)) issues.push("buyer name on the invoice is different from the PO");
     if (I.buyer_gstin !== P.buyer_gstin) issues.push("buyer GSTIN on the invoice is different from the PO");
-    if (!gstinValid(I.buyer_gstin)) notes.push("buyer GSTIN is not valid (format or check digit)");
     results.push({
-      name: "Company details", issues, notes,
+      name: "Company details", issues,
       okText: "Buyer name and GSTIN are the same on the PO and the invoice",
       po: [P.buyer_name, P.buyer_gstin],
       inv: [I.buyer_name, I.buyer_gstin]
@@ -943,11 +928,11 @@ function showResults({ results, header, invDate }) {
   s.textContent = failed.length
     ? `${passed.length} of ${results.length} checks passed → Hold, follow up with vendor`
     : `${results.length} of ${results.length} checks passed → Ready for manager approval`;
-  const noted = results.filter(r => r.notes?.length).map(r => r.name);
-  const extra = [];
-  if (failed.length) extra.push("Failed: " + failed.map(r => r.name).join(", "));
-  if (noted.length) extra.push("⚠ Notes to look at: " + noted.join(", "));
-  extra.forEach(t => { const sm = document.createElement("small"); sm.textContent = t; s.appendChild(sm); });
+  if (failed.length) {
+    const sm = document.createElement("small");
+    sm.textContent = "Failed: " + failed.map(r => r.name).join(", ");
+    s.appendChild(sm);
+  }
 
   const f = $("facts");
   f.replaceChildren();
@@ -963,9 +948,7 @@ function showResults({ results, header, invDate }) {
     const c = document.createElement("td");
     c.className = "check";
     c.textContent = r.name;
-    (ok ? [r.okText] : r.issues).forEach(t => { const w = document.createElement("div"); w.className = "why"; w.textContent = t; c.appendChild(w); });
-    (r.notes || []).forEach(t => { const w = document.createElement("div"); w.className = "why warn"; w.textContent = "⚠ " + t; c.appendChild(w); });
-    tr.appendChild(c);
+    (ok ? [r.okText] : r.issues).forEach(t => { const w = document.createElement("div"); w.className = "why"; w.textContent = t; c.appendChild(w); });    tr.appendChild(c);
     const st = document.createElement("td");
     st.className = "pass " + (ok ? "ok" : "no");
     st.textContent = ok ? "✓ Pass" : "✗ Fail";
