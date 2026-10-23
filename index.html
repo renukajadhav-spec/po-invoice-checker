@@ -128,12 +128,40 @@
     border-radius: 8px; padding: 10px; max-height: 260px; overflow: auto;
   }
   footer { color: var(--muted); font-size: 13px; text-align: center; margin-top: 24px; }
+
+  /* Login */
+  [hidden] { display: none !important; }
+  #login { max-width: 380px; margin: 40px auto 0; }
+  #login .edit { margin-bottom: 12px; padding: 8px 10px; }
+  #login .primary { width: 100%; }
+  .userbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 16px; font-size: 13px; color: var(--muted); }
+  .userbar b { color: var(--text); }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 <main>
   <h1>PO–Invoice Checker</h1>
   <p class="sub">Upload a PO and its invoice, and see ✓ / ✗ for each check. <span class="tag">MVP · fake data only</span></p>
+
+  <section class="card" id="login">
+    <h2>Sign in</h2>
+    <form id="loginForm">
+      <label for="email">Email</label>
+      <input class="edit" type="email" id="email" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input class="edit" type="password" id="password" autocomplete="current-password" required>
+      <button type="submit" class="primary" id="signInBtn">Sign in</button>
+    </form>
+    <div class="error" id="loginError"></div>
+    <p class="note">Only people added by the app owner can sign in.</p>
+  </section>
+
+  <div id="app" hidden>
+  <div class="userbar">
+    <span>Signed in as <b id="userEmail"></b></span>
+    <button type="button" class="small" id="signOutBtn">Sign out</button>
+  </div>
 
   <section class="card">
     <h2>1. Choose the files</h2>
@@ -197,6 +225,7 @@
       <div id="rules"></div>
     </details>
   </section>
+  </div>
 
   <footer>The app flags and holds. The manager approves.</footer>
 </main>
@@ -1075,6 +1104,50 @@ $("checkBtn").addEventListener("click", () => {
   };
   r.appendChild(table(["GST rates", "Valid from", "Valid to"],
     GST_RATES.map(s => [s.rates.map(x => x + "%").join(", "), showDate(s.from), s.to ? showDate(s.to) : "—"])));
+})();
+
+// ---------- Login (Supabase Auth) ----------
+// The publishable key is meant to be public; Supabase checks the email and password on its own server.
+const SUPABASE_URL = "https://mbormqyxqiwmbceufmmn.supabase.co";
+const SUPABASE_KEY = "sb_publishable_nEgw9AKlQAXCazrC6UtdfQ_yumbBymq";
+
+function showLoginError(msg) {
+  const e = $("loginError");
+  e.textContent = msg || "";
+  e.style.display = msg ? "block" : "none";
+}
+
+function showSignedIn(user) {
+  $("login").hidden = !!user;
+  $("app").hidden = !user;
+  $("userEmail").textContent = user ? user.email : "";
+}
+
+(async function startLogin() {
+  if (!window.supabase) {
+    showLoginError("Could not load the sign-in service. Check your internet connection and refresh the page.");
+    $("signInBtn").disabled = true;
+    return;
+  }
+  const auth = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY).auth;
+
+  const { data } = await auth.getSession();
+  showSignedIn(data.session?.user);
+  auth.onAuthStateChange((_event, session) => showSignedIn(session?.user));
+
+  $("loginForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    showLoginError("");
+    $("signInBtn").disabled = true;
+    $("signInBtn").textContent = "Signing in…";
+    const { error } = await auth.signInWithPassword({ email: $("email").value.trim(), password: $("password").value });
+    $("signInBtn").disabled = false;
+    $("signInBtn").textContent = "Sign in";
+    if (error) showLoginError(/invalid login/i.test(error.message) ? "Wrong email or password." : error.message);
+    else $("password").value = "";
+  });
+
+  $("signOutBtn").addEventListener("click", () => auth.signOut());
 })();
 </script>
 </body>
