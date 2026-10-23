@@ -195,7 +195,7 @@
 
   <section class="card">
     <details>
-      <summary>The rules the app uses (company, GST rates)</summary>
+      <summary>The rules the app uses (GST rates)</summary>
       <div id="rules"></div>
     </details>
   </section>
@@ -205,7 +205,6 @@
 
 <script>
 // ---------- Lookup data (all fake) ----------
-const COMPANY = { name: "Sunrise Demo Traders Pvt Ltd", gstin: "27AAKCS1234D1ZM" };
 
 // GST Rates table with Valid From / Valid To (simplified: main slabs only)
 const GST_RATES = [
@@ -500,7 +499,7 @@ function findGstins(lines) {
     gs.forEach((g, i) => found.push({ g, role: roles.length > 1 ? roles[i] : roles[0] }));
   }
   const unique = [...new Map(found.map(f => [f.g, f])).values()];
-  let buyer = unique.find(f => f.g === COMPANY.gstin) || unique.find(f => f.role === "buyer");
+  let buyer = unique.find(f => f.role === "buyer");
   const vendor = unique.find(f => f !== buyer && f.role === "vendor") || unique.find(f => f !== buyer);
   if (!buyer) buyer = unique.find(f => f !== vendor);
   return { vendor: vendor?.g || "", buyer: buyer?.g || "" };
@@ -622,7 +621,6 @@ function parseDocument(rawLines, side) {
     vendor_name: names.vendor || (side === "inv" ? issuer : ""),
     buyer_gstin: g.buyer,
     buyer_name: names.buyer || (side === "po" ? issuer : "")
-             || (text.toUpperCase().includes(COMPANY.name.toUpperCase()) ? COMPANY.name : "")
   };
   if (side === "po") {
     header.po_date = findDate(lines, ["P\\.?\\s?O\\.?\\s*Date", "Order\\s*Date", "\\bDated?"]);
@@ -814,7 +812,8 @@ function runChecks(po, inv) {
 
   const poByItem = {};
   po.forEach(l => poByItem[norm(l.item)] = l);
-  const sameState = I.vendor_gstin.slice(0, 2) === COMPANY.gstin.slice(0, 2);
+  // The first 2 digits of a GSTIN are the state code: same state → CGST + SGST, other state → IGST
+  const sameState = I.vendor_gstin.slice(0, 2) === I.buyer_gstin.slice(0, 2);
   const results = [];
 
   // Names compare without dots, commas and extra spaces ("Pvt. Ltd." = "Pvt Ltd")
@@ -840,7 +839,6 @@ function runChecks(po, inv) {
     if (!sameName(I.buyer_name, P.buyer_name)) issues.push("buyer name on the invoice is different from the PO");
     if (I.buyer_gstin !== P.buyer_gstin) issues.push("buyer GSTIN on the invoice is different from the PO");
     if (!gstinValid(I.buyer_gstin)) notes.push("buyer GSTIN is not valid (format or check digit)");
-    if (I.buyer_gstin !== COMPANY.gstin) notes.push(`buyer is not our company (${COMPANY.name}, ${COMPANY.gstin})`);
     results.push({
       name: "Company details", issues, notes,
       okText: "Buyer name and GSTIN are the same on the PO and the invoice",
@@ -1092,7 +1090,6 @@ $("checkBtn").addEventListener("click", () => {
     rows.forEach(row => { const tr = tb.insertRow(); row.forEach(v => tr.insertCell().textContent = v); });
     return t;
   };
-  r.appendChild(table(["Our company", "GSTIN"], [[COMPANY.name, COMPANY.gstin]]));
   r.appendChild(table(["GST rates", "Valid from", "Valid to"],
     GST_RATES.map(s => [s.rates.map(x => x + "%").join(", "), showDate(s.from), s.to ? showDate(s.to) : "—"])));
 })();
