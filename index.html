@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PO–Invoice Checker</title>
+<style>
+  :root {
+    --bg: #f4f7f7;
+    --card: #ffffff;
+    --text: #15302f;
+    --muted: #5b7271;
+    --line: #d7e2e1;
+    --accent: #0f766e;
+    --accent-soft: #e0f2f0;
+    --ok: #15803d;
+    --ok-soft: #e6f6eb;
+    --no: #b91c1c;
+    --no-soft: #fdecec;
+    --warn: #b45309;
+    --warn-soft: #fff4e0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1717;
+      --card: #122423;
+      --text: #e3f0ef;
+      --muted: #93abaa;
+      --line: #24403e;
+      --accent: #2dd4bf;
+      --accent-soft: #123a37;
+      --ok: #4ade80;
+      --ok-soft: #12301f;
+      --no: #f87171;
+      --no-soft: #3a1717;
+      --warn: #fbbf24;
+      --warn-soft: #3a2a0e;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { margin: 0 0 4px; font-size: 26px; }
+  h2 { margin: 0 0 12px; font-size: 18px; }
+  .sub { margin: 0 0 20px; color: var(--muted); }
+  .tag {
+    display: inline-block; padding: 2px 8px; border-radius: 99px;
+    background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 600;
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 18px; margin-bottom: 16px;
+  }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
+  label { display: block; font-weight: 600; margin-bottom: 6px; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  input[type=file], select { width: 100%; font: inherit; color: var(--text); }
+  select {
+    padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--card);
+  }
+  .or { text-align: center; color: var(--muted); margin: 14px 0; font-size: 13px; }
+  button {
+    font: inherit; cursor: pointer; border-radius: 8px; padding: 8px 14px;
+    border: 1px solid var(--line); background: var(--card); color: var(--text);
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary {
+    background: var(--accent); border-color: var(--accent); color: var(--card);
+    font-weight: 600; padding: 10px 22px;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .loaded { margin-top: 12px; font-size: 13px; color: var(--muted); }
+  .error {
+    display: none; margin-top: 12px; padding: 10px 12px; border-radius: 8px;
+    background: var(--no-soft); color: var(--no); font-weight: 600;
+  }
+  #results { display: none; }
+  .summary { padding: 14px 16px; border-radius: 10px; font-weight: 700; font-size: 17px; margin-bottom: 12px; }
+  .summary.ok { background: var(--ok-soft); color: var(--ok); }
+  .summary.hold { background: var(--warn-soft); color: var(--warn); }
+  .summary small { display: block; font-weight: 500; font-size: 13px; margin-top: 2px; }
+  .facts { display: flex; flex-wrap: wrap; gap: 6px 20px; font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+  .facts b { color: var(--text); }
+  .tablewrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 10px 8px; border-bottom: 1px solid var(--line); }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  td.check { font-weight: 600; min-width: 150px; }
+  td.check .why { font-weight: 400; font-size: 12px; color: var(--muted); margin-top: 3px; }
+  tr.fail td.check .why { color: var(--no); }
+  .status { font-weight: 700; white-space: nowrap; }
+  .status.ok { color: var(--ok); }
+  .status.no { color: var(--no); }
+  details summary { cursor: pointer; font-weight: 600; }
+  details table { margin-top: 10px; }
+  footer { color: var(--muted); font-size: 13px; text-align: center; margin-top: 24px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>PO–Invoice Checker</h1>
+  <p class="sub">Upload a PO and its invoice, and see ✓ / ✗ for each check. <span class="tag">MVP · fake data only</span></p>
+
+  <section class="card">
+    <h2>1. Choose the files</h2>
+    <div class="grid">
+      <div>
+        <label for="poFile">PO file (.csv)</label>
+        <input type="file" id="poFile" accept=".csv">
+        <div class="hint"><button type="button" id="dlPoTemplate">Download empty PO template</button></div>
+      </div>
+      <div>
+        <label for="invFile">Invoice file (.csv)</label>
+        <input type="file" id="invFile" accept=".csv">
+        <div class="hint"><button type="button" id="dlInvTemplate">Download empty invoice template</button></div>
+      </div>
+    </div>
+
+    <div class="or">— or —</div>
+
+    <label for="sample">Try a sample</label>
+    <div class="row">
+      <select id="sample" style="flex:1; min-width:220px">
+        <option value="">Choose a sample…</option>
+      </select>
+      <button type="button" id="dlSample">Download this sample</button>
+    </div>
+
+    <div class="loaded" id="loaded">No files chosen yet.</div>
+    <div class="error" id="error"></div>
+  </section>
+
+  <section class="card">
+    <h2>2. Check</h2>
+    <button type="button" class="primary" id="checkBtn">Check</button>
+  </section>
+
+  <section class="card" id="results">
+    <h2>3. Results</h2>
+    <div class="summary" id="summary"></div>
+    <div class="facts" id="facts"></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Check</th><th>Status</th><th>PO says</th><th>Invoice says</th></tr></thead>
+        <tbody id="resultRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary>The rules the app uses (company, vendors, GST rates)</summary>
+      <div id="rules"></div>
+    </details>
+  </section>
+
+  <footer>The app flags and holds. The manager approves.</footer>
+</main>
+
+<script>
+// ---------- Lookup data (all fake) ----------
+const COMPANY = { name: "Sunrise Demo Traders Pvt Ltd", gstin: "27AAKCS1234D1ZM" };
+
+const VENDORS = [
+  { name: "Kaveri Paper Mart",      gstin: "27AABCK5678E1ZD" },
+  { name: "Mysore Office Supplies", gstin: "29AAGFM4321P1ZV" },
+  { name: "Patel Packaging Co",     gstin: "24AACCP8765Q1ZM" }
+];
+
+// GST Rates table with Valid From / Valid To (simplified: main slabs only)
+const GST_RATES = [
+  { from: "2017-07-01", to: "2025-09-21", rates: [0, 5, 12, 18, 28] },
+  { from: "2025-09-22", to: null,         rates: [0, 5, 18, 40] }
+];
+
+const PO_COLS  = ["po_no", "po_date", "vendor_name", "vendor_gstin", "buyer_name", "buyer_gstin",
+                  "item", "hsn", "qty", "rate", "gst_rate"];
+const INV_COLS = ["invoice_no", "invoice_date", "po_no", "vendor_name", "vendor_gstin", "buyer_name", "buyer_gstin",
+                  "item", "hsn", "qty", "rate", "amount", "gst_rate", "cgst", "sgst", "igst"];
+
+// ---------- Samples (fake, based on the test cases) ----------
+const BUYER = "Sunrise Demo Traders Pvt Ltd,27AAKCS1234D1ZM";
+const SAMPLES = {
+  "1-all-correct": {
+    label: "1. All correct (expect 6/6 ✓)",
+    po: `${PO_COLS}
+PO-1001,2026-10-05,Kaveri Paper Mart,27AABCK5678E1ZD,${BUYER},Office Chair,9401,10,4500,18
+PO-1001,2026-10-05,Kaveri Paper Mart,27AABCK5678E1ZD,${BUYER},Whiteboard,9610,5,1200,18`,
+    inv: `${INV_COLS}
+INV-501,2026-10-12,PO-1001,Kaveri Paper Mart,27AABCK5678E1ZD,${BUYER},Office Chair,9401,10,4500,45000,18,4050,4050,0
+INV-501,2026-10-12,PO-1001,Kaveri Paper Mart,27AABCK5678E1ZD,${BUYER},Whiteboard,9610,5,1200,6000,18,540,540,0`
+  },
+  "2-qty-12-vs-13": {
+    label: "2. PO qty 12, invoice qty 13",
+    po: `${PO_COLS}
+PO-1002,2026-10-08,Mysore Office Supplies,29AAGFM4321P1ZV,${BUYER},Printer Toner,8443,12,2500,18`,
+    inv: `${INV_COLS}
+INV-M-207,2026-10-15,PO-1002,Mysore Office Supplies,29AAGFM4321P1ZV,${BUYER},Printer Toner,8443,13,2500,32500,18,0,0,5850`
+  },
+  "3-12pct-15-sep-2025": {
+    label: "3. 12% invoice dated 15 Sep 2025",
+    po: `${PO_COLS}
+PO-0901,2025-09-01,Patel Packaging Co,24AACCP8765Q1ZM,${BUYER},Corrugated Boxes,4819,200,35,12`,
+    inv: `${INV_COLS}
+INV-P-88,2025-09-15,PO-0901,Patel Packaging Co,24AACCP8765Q1ZM,${BUYER},Corrugated Boxes,4819,200,35,7000,12,0,0,840`
+  },
+  "4-12pct-25-sep-2025": {
+    label: "4. 12% invoice dated 25 Sep 2025",
+    po: `${PO_COLS}
+PO-0902,2025-09-10,Patel Packaging Co,24AACCP8765Q1ZM,${BUYER},Corrugated Boxes,4819,300,35,12`,
+    inv: `${INV_COLS}
+INV-P-95,2025-09-25,PO-0902,Patel Packaging Co,24AACCP8765Q1ZM,${BUYER},Corrugated Boxes,4819,300,35,10500,12,0,0,1260`
+  },
+  "5-wrong-buyer-and-tax": {
+    label: "5. Wrong buyer GSTIN + wrong tax",
+    po: `${PO_COLS}
+PO-1003,2026-10-10,Kaveri Paper Mart,27AABCK5678E1ZD,${BUYER},Desk Lamp,9405,20,800,18`,
+    inv: `${INV_COLS}
+INV-512,2026-10-18,PO-1003,Kaveri Paper Mart,27AABCK5678E1ZD,Sunrise Demo Traders Pvt Ltd,27AAKCS1243D1ZM,Desk Lamp,9405,20,800,16000,18,1540,1540,0`
+  }
+};
+
+// ---------- Small helpers ----------
+const $ = id => document.getElementById(id);
+const norm = s => String(s ?? "").trim().replace(/\s+/g, " ").toUpperCase();
+const money = n => "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+const round2 = n => Math.round(n * 100) / 100;
+const TOLERANCE = 1; // ₹1 rounding difference allowed
+
+function num(s) {
+  const t = String(s ?? "").replace(/[₹,\s]/g, "");
+  return t === "" ? NaN : Number(t);
+}
+
+const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+// Accepts 2025-09-25, 25-09-2025, 25/09/2025, 25.09.2025, 25-Sep-2025 or 25 Sep 2025. Returns "YYYY-MM-DD" or null.
+function parseDate(s) {
+  s = String(s ?? "").trim();
+  let y, m, d, x;
+  if ((x = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) [y, m, d] = [+x[1], +x[2], +x[3]];
+  else if ((x = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/))) [d, m, y] = [+x[1], +x[2], +x[3]];
+  else if ((x = s.match(/^(\d{1,2})[- ]([A-Za-z]{3})[a-z]*[- ](\d{4})$/))) [d, m, y] = [+x[1], MONTHS.indexOf(x[2].toUpperCase()) + 1, +x[3]];
+  else return null;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+  return dt.toISOString().slice(0, 10);
+}
+
+function showDate(iso) {
+  const [y, m, d] = iso.split("-");
+  return `${+d} ${MONTHS[m - 1][0] + MONTHS[m - 1].slice(1).toLowerCase()} ${y}`;
+}
+
+// GSTIN: 2-digit state + PAN (5 letters, 4 digits, 1 letter) + entity + Z + check digit
+const GSTIN_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+function gstinValid(g) {
+  if (!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(g)) return false;
+  let sum = 0;
+  for (let i = 0; i < 14; i++) {
+    const p = GSTIN_CHARS.indexOf(g[i]) * (i % 2 ? 2 : 1);
+    sum += Math.floor(p / 36) + (p % 36);
+  }
+  return GSTIN_CHARS[(36 - (sum % 36)) % 36] === g[14];
+}
+
+// ---------- Reading CSV files ----------
+function parseCSV(text) {
+  text = text.replace(/^﻿/, "");
+  const rows = [];
+  let row = [], cell = "", quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+      else if (c === '"') quoted = false;
+      else cell += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(cell); rows.push(row); row = []; cell = "";
+    } else cell += c;
+  }
+  row.push(cell); rows.push(row);
+  return rows.filter(r => r.some(v => v.trim() !== ""));
+}
+
+function toRecords(text, cols, label, numberCols) {
+  const rows = parseCSV(text);
+  if (rows.length === 0) throw new Error(`The ${label} file is empty.`);
+  const head = rows[0].map(h => h.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""));
+  const missing = cols.filter(c => !head.includes(c));
+  if (missing.length) throw new Error(`The ${label} file is missing these columns: ${missing.join(", ")}. Start from the template.`);
+  if (rows.length < 2) throw new Error(`The ${label} file has headings but no item rows.`);
+  return rows.slice(1).map((r, n) => {
+    const rec = {};
+    head.forEach((h, i) => rec[h] = (r[i] ?? "").trim());
+    for (const c of numberCols) {
+      const blankIsZero = ["cgst", "sgst", "igst"].includes(c) && rec[c] === "";
+      rec[c] = blankIsZero ? 0 : num(rec[c]);
+      if (isNaN(rec[c])) throw new Error(`The ${label} file, row ${n + 2}: "${c}" is not a number.`);
+    }
+    rec.vendor_gstin = norm(rec.vendor_gstin);
+    rec.buyer_gstin = norm(rec.buyer_gstin);
+    return rec;
+  });
+}
+
+// ---------- The 6 checks ----------
+function runChecks(po, inv) {
+  const P = po[0], I = inv[0];
+  const invDate = parseDate(I.invoice_date);
+  if (!invDate) throw new Error(`The invoice date "${I.invoice_date}" is not a date I can read. Use a format like 25-09-2025.`);
+
+  const poByItem = {};
+  po.forEach(l => poByItem[norm(l.item)] = l);
+  const sameState = I.vendor_gstin.slice(0, 2) === COMPANY.gstin.slice(0, 2);
+  const results = [];
+
+  // 1. GSTIN
+  {
+    const issues = [];
+    if (!gstinValid(I.vendor_gstin)) issues.push("invoice GSTIN is not valid (format or check digit)");
+    if (I.vendor_gstin !== P.vendor_gstin) issues.push("invoice GSTIN is different from the PO");
+    const v = VENDORS.find(v => v.gstin === I.vendor_gstin);
+    if (!v) issues.push("GSTIN is not in the vendor list");
+    else if (norm(v.name) !== norm(I.vendor_name)) issues.push(`vendor list says this GSTIN belongs to ${v.name}`);
+    results.push({
+      name: "GSTIN", issues,
+      okText: "Valid, same as the PO, and in the vendor list",
+      po: [P.vendor_name, P.vendor_gstin],
+      inv: [I.vendor_name, I.vendor_gstin]
+    });
+  }
+
+  // 2. Company details
+  {
+    const issues = [];
+    if (norm(I.buyer_name) !== norm(COMPANY.name)) issues.push(`buyer name should be ${COMPANY.name}`);
+    if (I.buyer_gstin !== COMPANY.gstin) issues.push(`buyer GSTIN should be ${COMPANY.gstin}`);
+    results.push({
+      name: "Company details", issues,
+      okText: "Billed to our company with the right GSTIN",
+      po: [P.buyer_name, P.buyer_gstin],
+      inv: [I.buyer_name, I.buyer_gstin]
+    });
+  }
+
+  // 3. GST rate
+  {
+    const issues = [];
+    const slab = GST_RATES.find(s => invDate >= s.from && (!s.to || invDate <= s.to));
+    inv.forEach(l => {
+      if (!slab) issues.push(`no GST rates set up for ${showDate(invDate)}`);
+      else if (!slab.rates.includes(l.gst_rate)) issues.push(`${l.item}: ${l.gst_rate}% is not a valid GST rate on ${showDate(invDate)}`);
+      const p = poByItem[norm(l.item)];
+      if (p && p.gst_rate !== l.gst_rate) issues.push(`${l.item}: PO says ${p.gst_rate}%, invoice says ${l.gst_rate}%`);
+    });
+    results.push({
+      name: "GST rate", issues: [...new Set(issues)],
+      okText: `Same as the PO, and valid on ${showDate(invDate)}`,
+      po: po.map(l => `${l.item}: ${l.gst_rate}%`),
+      inv: inv.map(l => `${l.item}: ${l.gst_rate}%`).concat(`Invoice date: ${showDate(invDate)}`)
+    });
+  }
+
+  // 4. GST calculation
+  {
+    const issues = [];
+    const exp = { cgst: 0, sgst: 0, igst: 0 }, got = { cgst: 0, sgst: 0, igst: 0 };
+    inv.forEach(l => {
+      const tax = round2(l.amount * l.gst_rate / 100);
+      const e = sameState ? { cgst: tax / 2, sgst: tax / 2, igst: 0 } : { cgst: 0, sgst: 0, igst: tax };
+      for (const k in e) { exp[k] += e[k]; got[k] += l[k]; }
+      const wrong = Object.keys(e).filter(k => Math.abs(e[k] - l[k]) > TOLERANCE);
+      if (wrong.length) issues.push(`${l.item}: ` + wrong.map(k => `${k.toUpperCase()} should be ${money(e[k])}, invoice has ${money(l[k])}`).join("; "));
+    });
+    const fmt = t => sameState ? `CGST ${money(t.cgst)} + SGST ${money(t.sgst)}` + (t.igst ? ` + IGST ${money(t.igst)}` : "")
+                               : `IGST ${money(t.igst)}` + (t.cgst || t.sgst ? ` + CGST ${money(t.cgst)} + SGST ${money(t.sgst)}` : "");
+    results.push({
+      name: "GST calculation", issues,
+      okText: `Amount × rate matches the tax (${sameState ? "same state → CGST + SGST" : "other state → IGST"})`,
+      po: [`Expected: ${fmt(exp)}`, sameState ? "Same state → CGST + SGST" : "Other state → IGST"],
+      inv: [fmt(got)]
+    });
+  }
+
+  // 5. Qty × rate
+  {
+    const issues = [];
+    inv.forEach(l => {
+      const e = round2(l.qty * l.rate);
+      if (Math.abs(e - l.amount) > TOLERANCE) issues.push(`${l.item}: ${l.qty} × ${money(l.rate)} = ${money(e)}, invoice says ${money(l.amount)}`);
+    });
+    results.push({
+      name: "Qty × rate", issues,
+      okText: "Every line adds up",
+      po: inv.map(l => `${l.item}: ${l.qty} × ${money(l.rate)} = ${money(round2(l.qty * l.rate))}`),
+      inv: inv.map(l => `${l.item}: ${money(l.amount)}`)
+    });
+  }
+
+  // 6. PO–invoice match
+  {
+    const issues = [];
+    if (norm(I.po_no) !== norm(P.po_no)) issues.push(`invoice is for ${I.po_no}, but this PO is ${P.po_no}`);
+    const qtyByItem = {};
+    inv.forEach(l => qtyByItem[norm(l.item)] = (qtyByItem[norm(l.item)] || 0) + l.qty);
+    inv.forEach(l => {
+      const p = poByItem[norm(l.item)];
+      if (!p) { issues.push(`${l.item} is not on the PO`); return; }
+      if (Math.abs(p.rate - l.rate) > 0.001) issues.push(`${l.item}: rate ${money(l.rate)}, PO rate ${money(p.rate)}`);
+    });
+    for (const k in qtyByItem) {
+      const p = poByItem[k];
+      if (p && qtyByItem[k] > p.qty) issues.push(`${p.item}: invoice qty ${qtyByItem[k]} is more than PO qty ${p.qty} (over-billing)`);
+    }
+    results.push({
+      name: "PO–invoice match", issues: [...new Set(issues)],
+      okText: "Same PO, items, rates, and qty within the PO",
+      po: [P.po_no].concat(po.map(l => `${l.item}: ${l.qty} × ${money(l.rate)}`)),
+      inv: [`${I.po_no} (invoice ${I.invoice_no})`].concat(inv.map(l => `${l.item}: ${l.qty} × ${money(l.rate)}`))
+    });
+  }
+
+  return { results, header: I, invDate };
+}
+
+// ---------- Showing the results ----------
+function cell(lines, cls) {
+  const td = document.createElement("td");
+  if (cls) td.className = cls;
+  lines.forEach(t => { const d = document.createElement("div"); d.textContent = t; td.appendChild(d); });
+  return td;
+}
+
+function showResults({ results, header, invDate }) {
+  const passed = results.filter(r => r.issues.length === 0);
+  const failed = results.filter(r => r.issues.length > 0);
+  const s = $("summary");
+  s.className = "summary " + (failed.length ? "hold" : "ok");
+  s.textContent = failed.length
+    ? `${passed.length} of ${results.length} checks passed → Hold, follow up with vendor`
+    : `${results.length} of ${results.length} checks passed → Ready for manager approval`;
+  if (failed.length) {
+    const sm = document.createElement("small");
+    sm.textContent = "Failed: " + failed.map(r => r.name).join(", ");
+    s.appendChild(sm);
+  }
+
+  const f = $("facts");
+  f.replaceChildren();
+  [["Invoice", header.invoice_no], ["Date", showDate(invDate)], ["Vendor", header.vendor_name], ["PO", header.po_no]]
+    .forEach(([k, v]) => { const sp = document.createElement("span"); sp.append(k + ": "); const b = document.createElement("b"); b.textContent = v; sp.appendChild(b); f.appendChild(sp); });
+
+  const body = $("resultRows");
+  body.replaceChildren();
+  results.forEach(r => {
+    const ok = r.issues.length === 0;
+    const tr = document.createElement("tr");
+    if (!ok) tr.className = "fail";
+    const c = document.createElement("td");
+    c.className = "check";
+    c.textContent = r.name;
+    (ok ? [r.okText] : r.issues).forEach(t => { const w = document.createElement("div"); w.className = "why"; w.textContent = t; c.appendChild(w); });
+    tr.appendChild(c);
+    const st = document.createElement("td");
+    st.className = "status " + (ok ? "ok" : "no");
+    st.textContent = ok ? "✓ Pass" : "✗ Fail";
+    tr.appendChild(st);
+    tr.appendChild(cell(r.po));
+    tr.appendChild(cell(r.inv));
+    body.appendChild(tr);
+  });
+  $("results").style.display = "block";
+  $("results").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// ---------- Page wiring ----------
+const state = { poText: null, poName: "", invText: null, invName: "" };
+
+function setError(msg) {
+  const e = $("error");
+  e.textContent = msg || "";
+  e.style.display = msg ? "block" : "none";
+  if (msg) $("results").style.display = "none";
+}
+
+function updateLoaded() {
+  $("loaded").textContent = `PO: ${state.poName || "not chosen"} · Invoice: ${state.invName || "not chosen"}`;
+}
+
+function download(name, text) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["﻿" + text + "\n"], { type: "text/csv" }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+async function readFile(input, side) {
+  setError("");
+  const file = input.files[0];
+  if (!file) return;
+  if (!/\.csv$/i.test(file.name)) {
+    input.value = "";
+    setError(`"${file.name}" is not a CSV file. In Excel use File → Save As → "CSV (Comma delimited)".`);
+    return;
+  }
+  state[side + "Text"] = await file.text();
+  state[side + "Name"] = file.name;
+  $("sample").value = "";
+  updateLoaded();
+}
+
+$("poFile").addEventListener("change", e => readFile(e.target, "po"));
+$("invFile").addEventListener("change", e => readFile(e.target, "inv"));
+
+for (const [key, s] of Object.entries(SAMPLES)) {
+  const o = document.createElement("option");
+  o.value = key;
+  o.textContent = s.label;
+  $("sample").appendChild(o);
+}
+
+$("sample").addEventListener("change", e => {
+  setError("");
+  const s = SAMPLES[e.target.value];
+  if (!s) return;
+  $("poFile").value = "";
+  $("invFile").value = "";
+  Object.assign(state, { poText: s.po, poName: `sample ${e.target.value}-po.csv`, invText: s.inv, invName: `sample ${e.target.value}-invoice.csv` });
+  updateLoaded();
+});
+
+$("dlSample").addEventListener("click", () => {
+  const key = $("sample").value;
+  if (!key) return setError("Choose a sample first, then download it.");
+  download(`${key}-po.csv`, SAMPLES[key].po);
+  download(`${key}-invoice.csv`, SAMPLES[key].inv);
+});
+
+$("dlPoTemplate").addEventListener("click", () => download("po-template.csv", PO_COLS.join(",")));
+$("dlInvTemplate").addEventListener("click", () => download("invoice-template.csv", INV_COLS.join(",")));
+
+$("checkBtn").addEventListener("click", () => {
+  setError("");
+  if (!state.poText || !state.invText) return setError("Choose both a PO file and an invoice file (or try a sample) first.");
+  try {
+    const po = toRecords(state.poText, PO_COLS, "PO", ["qty", "rate", "gst_rate"]);
+    const inv = toRecords(state.invText, INV_COLS, "invoice", ["qty", "rate", "amount", "gst_rate", "cgst", "sgst", "igst"]);
+    showResults(runChecks(po, inv));
+  } catch (err) {
+    setError(err.message);
+  }
+});
+
+// The rules section, built from the same lookup data the checks use
+(function showRules() {
+  const r = $("rules");
+  const table = (head, rows) => {
+    const t = document.createElement("table");
+    const hr = t.createTHead().insertRow();
+    head.forEach(h => { const th = document.createElement("th"); th.textContent = h; hr.appendChild(th); });
+    const tb = t.createTBody();
+    rows.forEach(row => { const tr = tb.insertRow(); row.forEach(v => tr.insertCell().textContent = v); });
+    return t;
+  };
+  r.appendChild(table(["Our company", "GSTIN"], [[COMPANY.name, COMPANY.gstin]]));
+  r.appendChild(table(["Vendor", "GSTIN"], VENDORS.map(v => [v.name, v.gstin])));
+  r.appendChild(table(["GST rates", "Valid from", "Valid to"],
+    GST_RATES.map(s => [s.rates.map(x => x + "%").join(", "), showDate(s.from), s.to ? showDate(s.to) : "—"])));
+})();
+</script>
+</body>
+</html>
