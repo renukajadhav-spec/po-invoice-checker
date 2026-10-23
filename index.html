@@ -61,13 +61,8 @@
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
   label { display: block; font-weight: 600; margin-bottom: 6px; }
-  .hint { color: var(--muted); font-size: 13px; margin-top: 6px; }
   .status { color: var(--accent); font-size: 13px; font-weight: 600; margin-top: 6px; min-height: 1.5em; }
-  input[type=file], select { width: 100%; font: inherit; color: var(--text); }
-  select {
-    padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--card);
-  }
-  .or { text-align: center; color: var(--muted); margin: 14px 0; font-size: 13px; }
+  input[type=file] { width: 100%; font: inherit; color: var(--text); }
   button {
     font: inherit; cursor: pointer; border-radius: 8px; padding: 8px 14px;
     border: 1px solid var(--line); background: var(--card); color: var(--text);
@@ -78,7 +73,6 @@
     background: var(--accent); border-color: var(--accent); color: var(--card);
     font-weight: 600; padding: 10px 22px;
   }
-  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
   .error {
     display: none; margin-top: 12px; padding: 10px 12px; border-radius: 8px;
     background: var(--no-soft); color: var(--no); font-weight: 600;
@@ -170,26 +164,12 @@
         <label for="poFile">PO file (CSV, PDF or image)</label>
         <input type="file" id="poFile" accept=".csv,.pdf,.jpg,.jpeg,.png">
         <div class="status" id="poStatus"></div>
-        <div class="hint"><button type="button" class="small" id="dlPoTemplate">Download empty PO template (CSV)</button></div>
       </div>
       <div>
         <label for="invFile">Invoice file (CSV, PDF or image)</label>
         <input type="file" id="invFile" accept=".csv,.pdf,.jpg,.jpeg,.png">
         <div class="status" id="invStatus"></div>
-        <div class="hint"><button type="button" class="small" id="dlInvTemplate">Download empty invoice template (CSV)</button></div>
       </div>
-    </div>
-    <p class="note">PDFs and images are read inside your browser and are never uploaded anywhere. The first image takes longer, because the free text reader downloads its English language file (about 10 MB, needs internet).
-      Fake test documents: <a href="samples/po-1001.pdf" download>PO-1001.pdf</a> · <a href="samples/invoice-501.pdf" download>Invoice-501.pdf</a> · <a href="samples/po-1002.pdf" download>PO-1002.pdf</a> · <a href="samples/invoice-m-207.png" download>Invoice-M-207.png</a></p>
-
-    <div class="or">— or —</div>
-
-    <label for="sample">Try a sample</label>
-    <div class="row">
-      <select id="sample" style="flex:1; min-width:220px">
-        <option value="">Choose a sample…</option>
-      </select>
-      <button type="button" id="dlSample">Download this sample (CSV)</button>
     </div>
 
     <div class="error" id="error"></div>
@@ -261,48 +241,6 @@ const NICE = {
 };
 const OPTIONAL = ["po_date", "hsn", "cgst", "sgst", "igst"];
 const NUMBER_FIELDS = ["qty", "rate", "amount", "gst_rate", "cgst", "sgst", "igst"];
-
-// ---------- Samples (fake, based on the test cases) ----------
-const BUYER = "Sunrise Demo Traders Pvt Ltd,27AAKCS1234D1ZM";
-const SAMPLES = {
-  "1-all-correct": {
-    label: "1. All correct (expect 6/6 ✓)",
-    po: `${PO_COLS}
-PO-1001,2026-10-05,Kaveri Paper Mart,27AABCK5678E1ZD,${BUYER},Office Chair,9401,10,4500,18
-PO-1001,2026-10-05,Kaveri Paper Mart,27AABCK5678E1ZD,${BUYER},Whiteboard,9610,5,1200,18`,
-    inv: `${INV_COLS}
-INV-501,2026-10-12,PO-1001,Kaveri Paper Mart,27AABCK5678E1ZD,${BUYER},Office Chair,9401,10,4500,45000,18,4050,4050,0
-INV-501,2026-10-12,PO-1001,Kaveri Paper Mart,27AABCK5678E1ZD,${BUYER},Whiteboard,9610,5,1200,6000,18,540,540,0`
-  },
-  "2-qty-12-vs-13": {
-    label: "2. PO qty 12, invoice qty 13",
-    po: `${PO_COLS}
-PO-1002,2026-10-08,Mysore Office Supplies,29AAGFM4321P1ZV,${BUYER},Printer Toner,8443,12,2500,18`,
-    inv: `${INV_COLS}
-INV-M-207,2026-10-15,PO-1002,Mysore Office Supplies,29AAGFM4321P1ZV,${BUYER},Printer Toner,8443,13,2500,32500,18,0,0,5850`
-  },
-  "3-12pct-15-sep-2025": {
-    label: "3. 12% invoice dated 15 Sep 2025",
-    po: `${PO_COLS}
-PO-0901,2025-09-01,Patel Packaging Co,24AACCP8765Q1ZM,${BUYER},Corrugated Boxes,4819,200,35,12`,
-    inv: `${INV_COLS}
-INV-P-88,2025-09-15,PO-0901,Patel Packaging Co,24AACCP8765Q1ZM,${BUYER},Corrugated Boxes,4819,200,35,7000,12,0,0,840`
-  },
-  "4-12pct-25-sep-2025": {
-    label: "4. 12% invoice dated 25 Sep 2025",
-    po: `${PO_COLS}
-PO-0902,2025-09-10,Patel Packaging Co,24AACCP8765Q1ZM,${BUYER},Corrugated Boxes,4819,300,35,12`,
-    inv: `${INV_COLS}
-INV-P-95,2025-09-25,PO-0902,Patel Packaging Co,24AACCP8765Q1ZM,${BUYER},Corrugated Boxes,4819,300,35,10500,12,0,0,1260`
-  },
-  "5-wrong-buyer-and-tax": {
-    label: "5. Wrong buyer GSTIN + wrong tax",
-    po: `${PO_COLS}
-PO-1003,2026-10-10,Kaveri Paper Mart,27AABCK5678E1ZD,${BUYER},Desk Lamp,9405,20,800,18`,
-    inv: `${INV_COLS}
-INV-512,2026-10-18,PO-1003,Kaveri Paper Mart,27AABCK5678E1ZD,Sunrise Demo Traders Pvt Ltd,27AAKCS1243D1ZM,Desk Lamp,9405,20,800,16000,18,1540,1540,0`
-  }
-};
 
 // ---------- Small helpers ----------
 const $ = id => document.getElementById(id);
@@ -998,14 +936,6 @@ function setError(msg) {
   if (msg) $("results").style.display = "none";
 }
 
-function download(name, text) {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob(["﻿" + text + "\n"], { type: "text/csv" }));
-  a.download = name;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
-
 function fileType(name) {
   if (/\.csv$/i.test(name)) return "csv";
   if (/\.pdf$/i.test(name)) return "pdf";
@@ -1033,7 +963,6 @@ async function handleFile(input, side) {
     status("");
     return setError(`"${file.name}" is not a CSV, PDF or image file (JPG/PNG).`);
   }
-  $("sample").value = "";
   status("Reading…");
   try {
     const doc = await readDocument(file, side, status);
@@ -1051,39 +980,9 @@ async function handleFile(input, side) {
 $("poFile").addEventListener("change", e => handleFile(e.target, "po"));
 $("invFile").addEventListener("change", e => handleFile(e.target, "inv"));
 
-for (const [key, s] of Object.entries(SAMPLES)) {
-  const o = document.createElement("option");
-  o.value = key;
-  o.textContent = s.label;
-  $("sample").appendChild(o);
-}
-
-$("sample").addEventListener("change", e => {
-  setError("");
-  const key = e.target.value, s = SAMPLES[key];
-  if (!s) return;
-  $("poFile").value = "";
-  $("invFile").value = "";
-  for (const side of ["po", "inv"]) {
-    const doc = recordsToDoc(toRecords(s[side], COLS[side], FIELDS[side].label), side);
-    renderReview(side, { ...doc, how: "sample", name: `${key}-${side === "po" ? "po" : "invoice"}.csv` });
-    $(side + "Status").textContent = "Sample loaded. See step 2.";
-  }
-});
-
-$("dlSample").addEventListener("click", () => {
-  const key = $("sample").value;
-  if (!key) return setError("Choose a sample first, then download it.");
-  download(`${key}-po.csv`, SAMPLES[key].po);
-  download(`${key}-invoice.csv`, SAMPLES[key].inv);
-});
-
-$("dlPoTemplate").addEventListener("click", () => download("po-template.csv", PO_COLS.join(",")));
-$("dlInvTemplate").addEventListener("click", () => download("invoice-template.csv", INV_COLS.join(",")));
-
 $("checkBtn").addEventListener("click", () => {
   setError("");
-  if (!loadedSides.po || !loadedSides.inv) return setError("Choose both a PO and an invoice (or try a sample) first.");
+  if (!loadedSides.po || !loadedSides.inv) return setError("Choose both a PO file and an invoice file first.");
   try {
     showResults(runChecks(collectSide("po"), collectSide("inv")));
   } catch (err) {

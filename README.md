@@ -16,11 +16,13 @@ The app opens with a **Sign in** screen (email + password). Sign-in is handled b
 
 ## How to use it
 1. Open the live link: https://renukajadhav-spec.github.io/po-invoice-checker/ (or `index.html` in a browser).
-2. Choose a PO file and an invoice file, each as **CSV, PDF or image (JPG/PNG)**, or pick **Try a sample**.
+2. Sign in, then choose a PO file and an invoice file, each as **CSV, PDF or image (JPG/PNG)**.
 3. **Review what was read.** The app fills in two editable tables. Correct anything it read wrongly; red boxes are empty and need filling in.
 4. Click **Check**. A summary appears, plus a table with **Check / Status / PO says / Invoice says**.
 
-To make your own CSV files, click **Download empty PO template** / **Download empty invoice template**, fill them in Excel (one row per item), and save as **CSV (Comma delimited)**.
+A CSV file needs these column headings (one row per item):
+- PO: `po_no, po_date, vendor_name, vendor_gstin, buyer_name, buyer_gstin, item, hsn, qty, rate, gst_rate`
+- Invoice: `invoice_no, invoice_date, po_no, vendor_name, vendor_gstin, buyer_name, buyer_gstin, item, hsn, qty, rate, amount, gst_rate, cgst, sgst, igst`
 
 ### How PDFs and images are read
 | File | Read with |
@@ -50,17 +52,8 @@ All 6 pass → **Ready for manager approval**. Any fail → **Hold, follow up wi
 ## Built-in rules
 - GST rates: 0/5/12/18/28% up to 21 Sep 2025; 0/5/18/40% from 22 Sep 2025 (main slabs only)
 
-## Samples
-| Sample | Expected |
-|---|---|
-| 1. All correct | 6/6 ✓ |
-| 2. PO qty 12, invoice qty 13 | ✗ PO–invoice match (over-billing) |
-| 3. 12% invoice dated 15 Sep 2025 | 6/6 ✓ (12% was valid then) |
-| 4. 12% invoice dated 25 Sep 2025 | ✗ GST rate |
-| 5. Wrong buyer GSTIN + wrong tax | ✗ Company details, ✗ GST calculation |
-
 ## How it's built
-One file, `index.html` (HTML + CSS + JavaScript), plus the free pdf.js and Tesseract.js libraries loaded from a CDN only when a PDF or image is chosen. No database, no login, no keys. Everything runs in the browser, and files are never uploaded anywhere.
+One file, `index.html` (HTML + CSS + JavaScript), plus free libraries from a CDN: supabase-js for sign-in, and pdf.js / Tesseract.js only when a PDF or image is chosen. No database tables and no secret keys. Files are read in the browser and never uploaded anywhere.
 
 ## Later versions
 - Smarter reading of messy layouts (for example AI, through a small server that keeps the key safe)
