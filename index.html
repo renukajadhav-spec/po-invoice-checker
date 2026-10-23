@@ -44,9 +44,11 @@
     color: var(--text);
     font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
-  main { max-width: 980px; margin: 0 auto; padding: 24px 16px 48px; }
+  main { max-width: 1040px; margin: 0 auto; padding: 24px 16px 48px; }
   h1 { margin: 0 0 4px; font-size: 26px; }
   h2 { margin: 0 0 12px; font-size: 18px; }
+  h3 { margin: 0 0 4px; font-size: 16px; }
+  a { color: var(--accent); }
   .sub { margin: 0 0 20px; color: var(--muted); }
   .tag {
     display: inline-block; padding: 2px 8px; border-radius: 99px;
@@ -59,7 +61,8 @@
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   @media (max-width: 640px) { .grid { grid-template-columns: 1fr; } }
   label { display: block; font-weight: 600; margin-bottom: 6px; }
-  .hint { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .status { color: var(--accent); font-size: 13px; font-weight: 600; margin-top: 6px; min-height: 1.5em; }
   input[type=file], select { width: 100%; font: inherit; color: var(--text); }
   select {
     padding: 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--card);
@@ -70,16 +73,38 @@
     border: 1px solid var(--line); background: var(--card); color: var(--text);
   }
   button:hover { border-color: var(--accent); }
+  button.small { padding: 3px 9px; font-size: 13px; }
   button.primary {
     background: var(--accent); border-color: var(--accent); color: var(--card);
     font-weight: 600; padding: 10px 22px;
   }
   .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-  .loaded { margin-top: 12px; font-size: 13px; color: var(--muted); }
   .error {
     display: none; margin-top: 12px; padding: 10px 12px; border-radius: 8px;
     background: var(--no-soft); color: var(--no); font-weight: 600;
   }
+  .note { font-size: 13px; color: var(--muted); }
+
+  /* Review step */
+  #review { display: none; }
+  .side { margin-bottom: 22px; }
+  .side:last-child { margin-bottom: 0; }
+  .side .how { color: var(--muted); font-size: 13px; margin-bottom: 10px; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px 12px; margin-bottom: 12px; }
+  .fields label { font-size: 12px; font-weight: 600; color: var(--muted); margin: 0 0 2px; }
+  .edit {
+    width: 100%; font: inherit; font-size: 14px; color: var(--text); background: var(--card);
+    border: 1px solid var(--line); border-radius: 6px; padding: 5px 7px;
+  }
+  .edit:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .edit.missing { border-color: var(--no); background: var(--no-soft); }
+  table.items td { padding: 4px; border-bottom: none; }
+  table.items th { padding: 4px; }
+  table.items .edit { min-width: 70px; }
+  table.items td:first-child .edit { min-width: 150px; }
+  .empty { color: var(--muted); font-style: italic; }
+
+  /* Results */
   #results { display: none; }
   .summary { padding: 14px 16px; border-radius: 10px; font-weight: 700; font-size: 17px; margin-bottom: 12px; }
   .summary.ok { background: var(--ok-soft); color: var(--ok); }
@@ -94,11 +119,15 @@
   td.check { font-weight: 600; min-width: 150px; }
   td.check .why { font-weight: 400; font-size: 12px; color: var(--muted); margin-top: 3px; }
   tr.fail td.check .why { color: var(--no); }
-  .status { font-weight: 700; white-space: nowrap; }
-  .status.ok { color: var(--ok); }
-  .status.no { color: var(--no); }
+  .pass { font-weight: 700; white-space: nowrap; }
+  .pass.ok { color: var(--ok); }
+  .pass.no { color: var(--no); }
   details summary { cursor: pointer; font-weight: 600; }
   details table { margin-top: 10px; }
+  details pre {
+    white-space: pre-wrap; font-size: 12px; background: var(--bg); border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px; max-height: 260px; overflow: auto;
+  }
   footer { color: var(--muted); font-size: 13px; text-align: center; margin-top: 24px; }
 </style>
 </head>
@@ -111,16 +140,20 @@
     <h2>1. Choose the files</h2>
     <div class="grid">
       <div>
-        <label for="poFile">PO file (.csv)</label>
-        <input type="file" id="poFile" accept=".csv">
-        <div class="hint"><button type="button" id="dlPoTemplate">Download empty PO template</button></div>
+        <label for="poFile">PO file (CSV, PDF or image)</label>
+        <input type="file" id="poFile" accept=".csv,.pdf,.jpg,.jpeg,.png">
+        <div class="status" id="poStatus"></div>
+        <div class="hint"><button type="button" class="small" id="dlPoTemplate">Download empty PO template (CSV)</button></div>
       </div>
       <div>
-        <label for="invFile">Invoice file (.csv)</label>
-        <input type="file" id="invFile" accept=".csv">
-        <div class="hint"><button type="button" id="dlInvTemplate">Download empty invoice template</button></div>
+        <label for="invFile">Invoice file (CSV, PDF or image)</label>
+        <input type="file" id="invFile" accept=".csv,.pdf,.jpg,.jpeg,.png">
+        <div class="status" id="invStatus"></div>
+        <div class="hint"><button type="button" class="small" id="dlInvTemplate">Download empty invoice template (CSV)</button></div>
       </div>
     </div>
+    <p class="note">PDFs and images are read inside your browser and are never uploaded anywhere. The first image takes longer, because the free text reader downloads its English language file (about 10 MB, needs internet).
+      Fake test documents: <a href="samples/po-1001.pdf" download>PO-1001.pdf</a> · <a href="samples/invoice-501.pdf" download>Invoice-501.pdf</a> · <a href="samples/po-1002.pdf" download>PO-1002.pdf</a> · <a href="samples/invoice-m-207.png" download>Invoice-M-207.png</a></p>
 
     <div class="or">— or —</div>
 
@@ -129,20 +162,26 @@
       <select id="sample" style="flex:1; min-width:220px">
         <option value="">Choose a sample…</option>
       </select>
-      <button type="button" id="dlSample">Download this sample</button>
+      <button type="button" id="dlSample">Download this sample (CSV)</button>
     </div>
 
-    <div class="loaded" id="loaded">No files chosen yet.</div>
     <div class="error" id="error"></div>
   </section>
 
+  <section class="card" id="review">
+    <h2>2. Review what was read</h2>
+    <p class="note" style="margin-top:-6px">Correct anything the app read wrongly. Boxes in red are empty and need filling in.</p>
+    <div class="side" id="review-po"></div>
+    <div class="side" id="review-inv"></div>
+  </section>
+
   <section class="card">
-    <h2>2. Check</h2>
+    <h2>3. Check</h2>
     <button type="button" class="primary" id="checkBtn">Check</button>
   </section>
 
   <section class="card" id="results">
-    <h2>3. Results</h2>
+    <h2>4. Results</h2>
     <div class="summary" id="summary"></div>
     <div class="facts" id="facts"></div>
     <div class="tablewrap">
@@ -178,11 +217,29 @@ const GST_RATES = [
   { from: "2017-07-01", to: "2025-09-21", rates: [0, 5, 12, 18, 28] },
   { from: "2025-09-22", to: null,         rates: [0, 5, 18, 40] }
 ];
+const ALL_RATES = [0, 5, 12, 18, 28, 40];
 
-const PO_COLS  = ["po_no", "po_date", "vendor_name", "vendor_gstin", "buyer_name", "buyer_gstin",
-                  "item", "hsn", "qty", "rate", "gst_rate"];
-const INV_COLS = ["invoice_no", "invoice_date", "po_no", "vendor_name", "vendor_gstin", "buyer_name", "buyer_gstin",
-                  "item", "hsn", "qty", "rate", "amount", "gst_rate", "cgst", "sgst", "igst"];
+// The fields on each side: header details (once per document) and item columns (once per line)
+const FIELDS = {
+  po:  { label: "PO",
+         header: ["po_no", "po_date", "vendor_name", "vendor_gstin", "buyer_name", "buyer_gstin"],
+         items:  ["item", "hsn", "qty", "rate", "gst_rate"] },
+  inv: { label: "Invoice",
+         header: ["invoice_no", "invoice_date", "po_no", "vendor_name", "vendor_gstin", "buyer_name", "buyer_gstin"],
+         items:  ["item", "hsn", "qty", "rate", "amount", "gst_rate", "cgst", "sgst", "igst"] }
+};
+const PO_COLS  = [...FIELDS.po.header,  ...FIELDS.po.items];
+const INV_COLS = [...FIELDS.inv.header, ...FIELDS.inv.items];
+const COLS = { po: PO_COLS, inv: INV_COLS };
+
+const NICE = {
+  po_no: "PO no.", po_date: "PO date", invoice_no: "Invoice no.", invoice_date: "Invoice date",
+  vendor_name: "Vendor name", vendor_gstin: "Vendor GSTIN", buyer_name: "Buyer name", buyer_gstin: "Buyer GSTIN",
+  item: "Item", hsn: "HSN", qty: "Qty", rate: "Rate", amount: "Amount", gst_rate: "GST %",
+  cgst: "CGST", sgst: "SGST", igst: "IGST"
+};
+const OPTIONAL = ["po_date", "hsn", "cgst", "sgst", "igst"];
+const NUMBER_FIELDS = ["qty", "rate", "amount", "gst_rate", "cgst", "sgst", "igst"];
 
 // ---------- Samples (fake, based on the test cases) ----------
 const BUYER = "Sunrise Demo Traders Pvt Ltd,27AAKCS1234D1ZM";
@@ -234,19 +291,19 @@ const round2 = n => Math.round(n * 100) / 100;
 const TOLERANCE = 1; // ₹1 rounding difference allowed
 
 function num(s) {
-  const t = String(s ?? "").replace(/[₹,\s]/g, "");
+  const t = String(s ?? "").replace(/[₹,\s%]/g, "");
   return t === "" ? NaN : Number(t);
 }
 
 const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 
-// Accepts 2025-09-25, 25-09-2025, 25/09/2025, 25.09.2025, 25-Sep-2025 or 25 Sep 2025. Returns "YYYY-MM-DD" or null.
+// Accepts 2025-09-25, 25-09-2025, 25/09/2025, 25.09.2025, 25-Sep-2025, 25 Sep 2025 or 25 September, 2025. Returns "YYYY-MM-DD" or null.
 function parseDate(s) {
   s = String(s ?? "").trim();
   let y, m, d, x;
   if ((x = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) [y, m, d] = [+x[1], +x[2], +x[3]];
   else if ((x = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/))) [d, m, y] = [+x[1], +x[2], +x[3]];
-  else if ((x = s.match(/^(\d{1,2})[- ]([A-Za-z]{3})[a-z]*[- ](\d{4})$/))) [d, m, y] = [+x[1], MONTHS.indexOf(x[2].toUpperCase()) + 1, +x[3]];
+  else if ((x = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[A-Za-z]*[-\s,]+(\d{4})$/))) [d, m, y] = [+x[1], MONTHS.indexOf(x[2].toUpperCase()) + 1, +x[3]];
   else return null;
   const dt = new Date(Date.UTC(y, m - 1, d));
   if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
@@ -292,20 +349,391 @@ function parseCSV(text) {
   return rows.filter(r => r.some(v => v.trim() !== ""));
 }
 
-function toRecords(text, cols, label, numberCols) {
+// CSV text → one record (all fields as text) per item row
+function toRecords(text, cols, label) {
   const rows = parseCSV(text);
   if (rows.length === 0) throw new Error(`The ${label} file is empty.`);
   const head = rows[0].map(h => h.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""));
   const missing = cols.filter(c => !head.includes(c));
   if (missing.length) throw new Error(`The ${label} file is missing these columns: ${missing.join(", ")}. Start from the template.`);
   if (rows.length < 2) throw new Error(`The ${label} file has headings but no item rows.`);
-  return rows.slice(1).map((r, n) => {
+  return rows.slice(1).map(r => {
     const rec = {};
     head.forEach((h, i) => rec[h] = (r[i] ?? "").trim());
-    for (const c of numberCols) {
-      const blankIsZero = ["cgst", "sgst", "igst"].includes(c) && rec[c] === "";
-      rec[c] = blankIsZero ? 0 : num(rec[c]);
-      if (isNaN(rec[c])) throw new Error(`The ${label} file, row ${n + 2}: "${c}" is not a number.`);
+    return rec;
+  });
+}
+
+// Records → a document: header details from the first row, every row as an item line
+function recordsToDoc(records, side) {
+  const header = {}, f = FIELDS[side];
+  f.header.forEach(k => header[k] = records[0][k] ?? "");
+  const items = records.map(r => Object.fromEntries(f.items.map(k => [k, r[k] ?? ""])));
+  return { header, items };
+}
+
+// ---------- Reading PDFs and images ----------
+const LIBS = {
+  pdf:       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",
+  pdfWorker: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js",
+  ocr:       "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"
+};
+const scriptLoads = {};
+function loadScript(src) {
+  return scriptLoads[src] ||= new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => { delete scriptLoads[src]; reject(new Error("Could not load the PDF/image reader. Check your internet connection and try again.")); };
+    document.head.appendChild(s);
+  });
+}
+
+// pdf.js gives separate pieces of text with positions; put pieces at the same height onto one line
+function groupLines(pieces) {
+  const rows = [];
+  for (const p of pieces) {
+    const row = rows.find(r => Math.abs(r.y - p.y) < 3);
+    if (row) row.pieces.push(p); else rows.push({ y: p.y, pieces: [p] });
+  }
+  return rows.sort((a, b) => b.y - a.y)
+             .map(r => r.pieces.sort((a, b) => a.x - b.x).map(p => p.s.trim()).join("  "));
+}
+
+// One OCR worker is started once and reused; psm is Tesseract's page layout mode
+let ocrWorker = null, ocrProgress = () => {};
+async function ocrToLines(image, psm, progress, part) {
+  await loadScript(LIBS.ocr);
+  ocrProgress = m => progress(m.status === "recognizing text"
+    ? `Reading the text${part}… ${Math.round(m.progress * 100)}%`
+    : `Getting the text reader ready (${m.status})…`);
+  ocrWorker ||= Tesseract.createWorker("eng", 1, { logger: m => ocrProgress(m) });
+  const worker = await ocrWorker;
+  await worker.setParameters({ tessedit_pageseg_mode: psm });
+  const { data } = await worker.recognize(image);
+  return data.text.split("\n");
+}
+
+// OCR can miss table rows, so if no item line is found, read again with a different page layout mode
+async function readByOcr(images, side, progress) {
+  let best = null;
+  for (const [psm, tryLabel] of [["3", ""], ["6", ", 2nd try"], ["4", ", 3rd try"]]) {
+    let lines = [];
+    for (let i = 0; i < images.length; i++) {
+      const page = images.length > 1 ? `page ${i + 1} of ${images.length}` : "";
+      const part = page || tryLabel ? ` (${[page, tryLabel.slice(2)].filter(Boolean).join(", ")})` : "";
+      lines = lines.concat(await ocrToLines(images[i], psm, progress, part));
+    }
+    const doc = parseDocument(lines, side);
+    if (!best) best = doc;
+    else if (doc.items.length > best.items.length) {
+      for (const k in doc.header) doc.header[k] ||= best.header[k];
+      best = doc;
+    }
+    if (best.items.length) break;
+  }
+  return best;
+}
+
+// A PDF with typed text gives its lines; a scanned PDF (only pictures of pages) gives page images for OCR
+async function readPdf(file) {
+  await loadScript(LIBS.pdf);
+  pdfjsLib.GlobalWorkerOptions.workerSrc = LIBS.pdfWorker;
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  let lines = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const pieces = content.items.filter(i => i.str.trim()).map(i => ({ x: i.transform[4], y: i.transform[5], s: i.str }));
+    lines = lines.concat(groupLines(pieces));
+  }
+  if (lines.join("").replace(/\s/g, "").length >= 20) return { lines };
+
+  const images = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const viewport = page.getViewport({ scale: 2 });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    images.push(canvas);
+  }
+  return { images };
+}
+
+// ---------- Finding the fields in the text that was read ----------
+const GSTIN_RE = /\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]/g;
+const DATE_SRC = "(\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}[-\\/.]\\d{1,2}[-\\/.]\\d{4}|\\d{1,2}[-\\s][A-Za-z]{3,9}[-\\s,]+\\d{4})";
+const BUYER_WORDS  = /bill(ed)?\s*to|buyer|customer|ship\s*to|consignee|invoice\s*to/i;
+const VENDOR_WORDS = /supplier|vendor|seller|sold\s*by|\bfrom\b/i;
+const TOTAL_WORDS  = /total|round\s*off|in\s+words|balance|grand|cgst|sgst|igst|taxable/i;
+
+const cleanLine = l => l.replace(/[|₹]/g, " ").replace(/\bRs\.?/gi, " ").replace(/\s+/g, " ").trim();
+
+function valueAfter(lines, labelSrc, valueSrc) {
+  const re = new RegExp(labelSrc + "\\s*[:\\-]?\\s*" + valueSrc, "i");
+  for (const l of lines) { const m = l.match(re); if (m && /\d/.test(m[1])) return m[1].replace(/[.,;:]$/, ""); }
+  return "";
+}
+
+function findDate(lines, labels) {
+  for (const label of labels) {
+    const v = valueAfter(lines, label, DATE_SRC);
+    if (v && parseDate(v)) return parseDate(v);
+  }
+  return "";
+}
+
+function findGstins(lines) {
+  // Remember which section each GSTIN sits in (vendor or buyer); two sections side by side share one line
+  let roles = [];
+  const found = [];
+  for (const l of lines) {
+    const b = l.search(BUYER_WORDS), v = l.search(VENDOR_WORDS);
+    if (b >= 0 && v >= 0) roles = b < v ? ["buyer", "vendor"] : ["vendor", "buyer"];
+    else if (b >= 0) roles = ["buyer"];
+    else if (v >= 0) roles = ["vendor"];
+    const gs = l.toUpperCase().replace(/\s/g, "").match(GSTIN_RE) || [];
+    gs.forEach((g, i) => found.push({ g, role: roles.length > 1 ? roles[i] : roles[0] }));
+  }
+  const unique = [...new Map(found.map(f => [f.g, f])).values()];
+  let buyer = unique.find(f => f.g === COMPANY.gstin) || unique.find(f => f.role === "buyer");
+  const vendor = unique.find(f => f !== buyer && (f.role === "vendor" || VENDORS.some(v => v.gstin === f.g)))
+              || unique.find(f => f !== buyer);
+  if (!buyer) buyer = unique.find(f => f !== vendor);
+  return { vendor: vendor?.g || "", buyer: buyer?.g || "" };
+}
+
+// Every number on a line, with its position (GSTINs and dates are blanked out first)
+function numbersIn(line) {
+  const blank = m => " ".repeat(m.length);
+  const s = line.toUpperCase().replace(GSTIN_RE, blank).replace(new RegExp(DATE_SRC, "g"), blank);
+  const out = [];
+  const re = /(?<![A-Z\d\-\/.,])(\d{1,3}(?:,\d{2,3})+(?:\.\d+)?|\d+(?:\.\d+)?)(\s?%)?(?![A-Z\d])/g;
+  let m;
+  while ((m = re.exec(s))) {
+    out.push({ v: Number(m[1].replace(/,/g, "")), pct: !!m[2], idx: m.index, int: /^\d+$/.test(m[1]), digits: m[1].length });
+  }
+  return out;
+}
+
+const near = (a, b) => Math.abs(a - b) <= TOLERANCE;
+
+// An item line is any line where some qty × rate = amount, whatever the column order
+function parseItemLine(line, taxType) {
+  if (TOTAL_WORDS.test(line)) return null;
+  const nums = numbersIn(line);
+  const plain = nums.filter(n => !n.pct);
+  if (plain.length < 3) return null;
+
+  let best = null;
+  for (const q of plain) for (const r of plain) for (const a of plain) {
+    if (q === r || q === a || r === a || !(q.v > 0 && r.v > 0 && a.v > 0)) continue;
+    if (!near(q.v * r.v, a.v) || a.v < r.v) continue;
+    let score = (q.idx < r.idx && r.idx < a.idx ? 2 : 0) + (q.int ? 1 : 0) - (q.v === 1 && q === plain[0] ? 1 : 0);
+    if (!best || score > best.score || (score === best.score && a.v > best.a.v)) best = { q, r, a, score };
+  }
+  if (!best) return null;
+  const { q, r, a } = best;
+  const used = new Set([q, r, a]);
+
+  const hsn = plain.find(n => !used.has(n) && n.int && [4, 6, 8].includes(n.digits) && n.idx < q.idx);
+  if (hsn) used.add(hsn);
+
+  // GST %: a % that is a GST rate, or two equal halves (CGST 9% + SGST 9% → 18%)
+  const pcts = nums.filter(n => n.pct).map(n => n.v);
+  let gst = pcts.find(p => p > 0 && ALL_RATES.includes(p));
+  if (gst === undefined && pcts.length && ALL_RATES.includes(pcts[0] * 2)) gst = pcts[0] * 2;
+
+  // Tax amounts: first by value (amount × rate), else by position after the amount
+  const rest = plain.filter(n => !used.has(n) && n.idx > a.idx);
+  const tryRates = gst !== undefined ? [gst] : ALL_RATES.filter(x => x > 0);
+  let cgst = "", sgst = "", igst = "";
+  for (const g of tryRates) {
+    const halves = rest.filter(n => near(n.v, a.v * g / 200));
+    const full = rest.find(n => near(n.v, a.v * g / 100));
+    if (halves.length >= 2) { cgst = halves[0].v; sgst = halves[1].v; igst = 0; gst ??= g; break; }
+    if (full) { igst = full.v; cgst = 0; sgst = 0; gst ??= g; break; }
+  }
+  if (cgst === "" && igst === "") {
+    if (taxType === "cs" && rest.length >= 2) { cgst = rest[0].v; sgst = rest[1].v; igst = 0; }
+    else if (taxType === "i" && rest.length >= 1) { igst = rest[0].v; cgst = 0; sgst = 0; }
+  }
+
+  const firstIdx = Math.min(...[...used].map(n => n.idx));
+  const item = line.slice(0, firstIdx).replace(/^\s*\d+[.)]?\s+/, "").replace(/[^A-Za-z0-9)]+$/, "").trim();
+
+  return { item, hsn: hsn ? String(hsn.v) : "", qty: q.v, rate: r.v, amount: a.v, gst_rate: gst ?? "", cgst, sgst, igst };
+}
+
+// The last amount on a line such as "CGST @ 9% 4,590.00"
+function lastAmount(line) {
+  const plain = numbersIn(line).filter(n => !n.pct);
+  return plain.length ? plain[plain.length - 1].v : null;
+}
+
+function parseDocument(rawLines, side) {
+  const lines = rawLines.map(cleanLine).filter(Boolean);
+  const text = lines.join("\n");
+  const g = findGstins(lines);
+  const taxType = /\bCGST\b/i.test(text) ? "cs" : /\bIGST\b/i.test(text) ? "i" : "";
+
+  const header = {
+    po_no: valueAfter(lines, "(?:\\bP\\.?\\s?O\\.?|Purchase\\s+Order|Order)\\s*(?:No\\.?|Number|#)", "([A-Z0-9][A-Z0-9\\-\\/]*)")
+        || valueAfter(lines, "", "\\b(PO[-\\/][A-Z0-9\\-\\/]+)"),
+    vendor_gstin: g.vendor,
+    vendor_name: VENDORS.find(v => v.gstin === g.vendor)?.name || "",
+    buyer_gstin: g.buyer,
+    buyer_name: text.toUpperCase().includes(COMPANY.name.toUpperCase()) ? COMPANY.name : ""
+  };
+  if (side === "po") {
+    header.po_date = findDate(lines, ["P\\.?\\s?O\\.?\\s*Date", "Order\\s*Date", "\\bDated?"]);
+  } else {
+    header.invoice_no = valueAfter(lines, "(?:Invoice|Inv\\.?|Bill)\\s*(?:No\\.?|Number|#)", "([A-Z0-9][A-Z0-9\\-\\/]*)")
+                     || valueAfter(lines, "", "\\b(INV[-\\/][A-Z0-9\\-\\/]+)");
+    header.invoice_date = findDate(lines, ["Invoice\\s*Date", "Inv\\.?\\s*Date", "Bill\\s*Date", "(?<!P\\.?O\\.?\\s|Order\\s|Due\\s)\\bDated?"]);
+  }
+
+  const items = lines.map(l => parseItemLine(l, taxType)).filter(Boolean);
+
+  // If the item lines had no tax amounts, use the CGST / SGST / IGST total lines, shared out by amount
+  if (side === "inv" && items.length && items.every(it => it.cgst === "" && it.igst === "")) {
+    const totals = { cgst: 0, sgst: 0, igst: 0 };
+    let any = false;
+    for (const l of lines) for (const k of ["cgst", "sgst", "igst"]) {
+      if (new RegExp("\\b" + k + "\\b", "i").test(l) && !/total/i.test(l.replace(new RegExp(k, "i"), ""))) {
+        const v = lastAmount(l);
+        if (v !== null) { totals[k] += v; any = true; }
+      }
+    }
+    if (any) {
+      const sum = items.reduce((s, it) => s + it.amount, 0);
+      for (const k in totals) {
+        let left = totals[k];
+        items.forEach((it, i) => {
+          it[k] = i === items.length - 1 ? round2(left) : round2(totals[k] * it.amount / sum);
+          left -= it[k];
+        });
+      }
+    }
+  }
+
+  const f = FIELDS[side];
+  return {
+    header: Object.fromEntries(f.header.map(k => [k, header[k] ?? ""])),
+    items: items.map(it => Object.fromEntries(f.items.map(k => [k, it[k] ?? ""]))),
+    text: rawLines.join("\n")
+  };
+}
+
+// ---------- Review step: editable tables ----------
+const loadedSides = { po: false, inv: false };
+
+function makeInput(field, value) {
+  const inp = document.createElement("input");
+  inp.className = "edit";
+  inp.dataset.f = field;
+  inp.value = value ?? "";
+  inp.setAttribute("aria-label", NICE[field]);
+  const mark = () => inp.classList.toggle("missing", !OPTIONAL.includes(field) && inp.value.trim() === "");
+  inp.addEventListener("input", mark);
+  mark();
+  return inp;
+}
+
+function addItemRow(tbody, side, item = {}) {
+  const tr = tbody.insertRow();
+  FIELDS[side].items.forEach(k => tr.insertCell().appendChild(makeInput(k, item[k])));
+  const del = document.createElement("button");
+  del.type = "button";
+  del.className = "small";
+  del.textContent = "✕";
+  del.title = "Delete this row";
+  del.addEventListener("click", () => tr.remove());
+  tr.insertCell().appendChild(del);
+}
+
+function renderReview(side, doc) {
+  const box = $("review-" + side), f = FIELDS[side];
+  box.replaceChildren();
+
+  const h = document.createElement("h3");
+  h.textContent = f.label;
+  const how = document.createElement("div");
+  how.className = "how";
+  how.textContent = `Read from ${doc.how}: ${doc.name}`;
+  box.append(h, how);
+
+  const fields = document.createElement("div");
+  fields.className = "fields";
+  f.header.forEach(k => {
+    const wrap = document.createElement("div");
+    const lab = document.createElement("label");
+    lab.textContent = NICE[k] + (OPTIONAL.includes(k) ? " (optional)" : "");
+    wrap.append(lab, makeInput(k, doc.header[k]));
+    fields.appendChild(wrap);
+  });
+  box.appendChild(fields);
+
+  const wrap = document.createElement("div");
+  wrap.className = "tablewrap";
+  const table = document.createElement("table");
+  table.className = "items";
+  const hr = table.createTHead().insertRow();
+  [...f.items.map(k => NICE[k]), ""].forEach(t => { const th = document.createElement("th"); th.textContent = t; hr.appendChild(th); });
+  const tbody = table.createTBody();
+  doc.items.forEach(it => addItemRow(tbody, side, it));
+  if (!doc.items.length) addItemRow(tbody, side);
+  wrap.appendChild(table);
+  box.appendChild(wrap);
+
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "small";
+  add.textContent = "+ Add item row";
+  add.style.marginTop = "6px";
+  add.addEventListener("click", () => addItemRow(tbody, side));
+  box.appendChild(add);
+
+  if (doc.text) {
+    const d = document.createElement("details");
+    d.style.marginTop = "10px";
+    const s = document.createElement("summary");
+    s.textContent = "Show the text that was read";
+    const pre = document.createElement("pre");
+    pre.textContent = doc.text;
+    d.append(s, pre);
+    box.appendChild(d);
+  }
+
+  loadedSides[side] = true;
+  $("review").style.display = "block";
+  $("results").style.display = "none";
+}
+
+// Review tables → checked records (one per item, header details repeated), ready for the checks
+function collectSide(side) {
+  const box = $("review-" + side), f = FIELDS[side];
+  const header = {};
+  box.querySelectorAll(".fields .edit").forEach(i => header[i.dataset.f] = i.value.trim());
+  const items = [...box.querySelectorAll("table.items tbody tr")].map(tr => {
+    const it = {};
+    tr.querySelectorAll(".edit").forEach(i => it[i.dataset.f] = i.value.trim());
+    return it;
+  }).filter(it => Object.values(it).some(v => v !== ""));
+
+  if (!items.length) throw new Error(`${f.label}: add at least one item row.`);
+  const empty = f.header.filter(k => !OPTIONAL.includes(k) && !header[k]).map(k => NICE[k]);
+  items.forEach((it, n) => f.items.forEach(k => { if (!OPTIONAL.includes(k) && !it[k]) empty.push(`${NICE[k]} (row ${n + 1})`); }));
+  if (empty.length) throw new Error(`${f.label}: fill in the red boxes first: ${empty.join(", ")}.`);
+
+  return items.map((it, n) => {
+    const rec = { ...header, ...it };
+    for (const k of NUMBER_FIELDS) {
+      if (!(k in rec)) continue;
+      rec[k] = ["cgst", "sgst", "igst"].includes(k) && rec[k] === "" ? 0 : num(rec[k]);
+      if (isNaN(rec[k])) throw new Error(`${f.label}, row ${n + 1}: "${NICE[k]}" is not a number.`);
     }
     rec.vendor_gstin = norm(rec.vendor_gstin);
     rec.buyer_gstin = norm(rec.buyer_gstin);
@@ -472,7 +900,7 @@ function showResults({ results, header, invDate }) {
     (ok ? [r.okText] : r.issues).forEach(t => { const w = document.createElement("div"); w.className = "why"; w.textContent = t; c.appendChild(w); });
     tr.appendChild(c);
     const st = document.createElement("td");
-    st.className = "status " + (ok ? "ok" : "no");
+    st.className = "pass " + (ok ? "ok" : "no");
     st.textContent = ok ? "✓ Pass" : "✗ Fail";
     tr.appendChild(st);
     tr.appendChild(cell(r.po));
@@ -484,17 +912,11 @@ function showResults({ results, header, invDate }) {
 }
 
 // ---------- Page wiring ----------
-const state = { poText: null, poName: "", invText: null, invName: "" };
-
 function setError(msg) {
   const e = $("error");
   e.textContent = msg || "";
   e.style.display = msg ? "block" : "none";
   if (msg) $("results").style.display = "none";
-}
-
-function updateLoaded() {
-  $("loaded").textContent = `PO: ${state.poName || "not chosen"} · Invoice: ${state.invName || "not chosen"}`;
 }
 
 function download(name, text) {
@@ -505,23 +927,50 @@ function download(name, text) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
-async function readFile(input, side) {
-  setError("");
-  const file = input.files[0];
-  if (!file) return;
-  if (!/\.csv$/i.test(file.name)) {
-    input.value = "";
-    setError(`"${file.name}" is not a CSV file. In Excel use File → Save As → "CSV (Comma delimited)".`);
-    return;
-  }
-  state[side + "Text"] = await file.text();
-  state[side + "Name"] = file.name;
-  $("sample").value = "";
-  updateLoaded();
+function fileType(name) {
+  if (/\.csv$/i.test(name)) return "csv";
+  if (/\.pdf$/i.test(name)) return "pdf";
+  if (/\.(jpe?g|png)$/i.test(name)) return "image";
+  return null;
 }
 
-$("poFile").addEventListener("change", e => readFile(e.target, "po"));
-$("invFile").addEventListener("change", e => readFile(e.target, "inv"));
+// Any file → a document { header, items, how, name, text }
+async function readDocument(file, side, progress) {
+  const type = fileType(file.name);
+  if (type === "csv") return { ...recordsToDoc(toRecords(await file.text(), COLS[side], FIELDS[side].label), side), how: "CSV", name: file.name };
+  if (type === "image") return { ...await readByOcr([file], side, progress), how: "image (OCR)", name: file.name };
+  const pdf = await readPdf(file);
+  if (pdf.lines) return { ...parseDocument(pdf.lines, side), how: "PDF text", name: file.name };
+  return { ...await readByOcr(pdf.images, side, progress), how: "scanned PDF (OCR)", name: file.name };
+}
+
+async function handleFile(input, side) {
+  setError("");
+  const file = input.files[0];
+  const status = t => $(side + "Status").textContent = t;
+  if (!file) return;
+  if (!fileType(file.name)) {
+    input.value = "";
+    status("");
+    return setError(`"${file.name}" is not a CSV, PDF or image file (JPG/PNG).`);
+  }
+  $("sample").value = "";
+  status("Reading…");
+  try {
+    const doc = await readDocument(file, side, status);
+    renderReview(side, doc);
+    status(doc.how === "CSV"
+      ? `Read ${doc.items.length} item row(s). See step 2.`
+      : `Read ${doc.items.length} item line(s) from ${doc.how}. Please check step 2.`);
+  } catch (err) {
+    input.value = "";
+    status("");
+    setError(err.message);
+  }
+}
+
+$("poFile").addEventListener("change", e => handleFile(e.target, "po"));
+$("invFile").addEventListener("change", e => handleFile(e.target, "inv"));
 
 for (const [key, s] of Object.entries(SAMPLES)) {
   const o = document.createElement("option");
@@ -532,12 +981,15 @@ for (const [key, s] of Object.entries(SAMPLES)) {
 
 $("sample").addEventListener("change", e => {
   setError("");
-  const s = SAMPLES[e.target.value];
+  const key = e.target.value, s = SAMPLES[key];
   if (!s) return;
   $("poFile").value = "";
   $("invFile").value = "";
-  Object.assign(state, { poText: s.po, poName: `sample ${e.target.value}-po.csv`, invText: s.inv, invName: `sample ${e.target.value}-invoice.csv` });
-  updateLoaded();
+  for (const side of ["po", "inv"]) {
+    const doc = recordsToDoc(toRecords(s[side], COLS[side], FIELDS[side].label), side);
+    renderReview(side, { ...doc, how: "sample", name: `${key}-${side === "po" ? "po" : "invoice"}.csv` });
+    $(side + "Status").textContent = "Sample loaded. See step 2.";
+  }
 });
 
 $("dlSample").addEventListener("click", () => {
@@ -552,11 +1004,9 @@ $("dlInvTemplate").addEventListener("click", () => download("invoice-template.cs
 
 $("checkBtn").addEventListener("click", () => {
   setError("");
-  if (!state.poText || !state.invText) return setError("Choose both a PO file and an invoice file (or try a sample) first.");
+  if (!loadedSides.po || !loadedSides.inv) return setError("Choose both a PO and an invoice (or try a sample) first.");
   try {
-    const po = toRecords(state.poText, PO_COLS, "PO", ["qty", "rate", "gst_rate"]);
-    const inv = toRecords(state.invText, INV_COLS, "invoice", ["qty", "rate", "amount", "gst_rate", "cgst", "sgst", "igst"]);
-    showResults(runChecks(po, inv));
+    showResults(runChecks(collectSide("po"), collectSide("inv")));
   } catch (err) {
     setError(err.message);
   }
