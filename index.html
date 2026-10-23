@@ -297,13 +297,14 @@ function num(s) {
 
 const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
 
-// Accepts 2025-09-25, 25-09-2025, 25/09/2025, 25.09.2025, 25-Sep-2025, 25 Sep 2025 or 25 September, 2025. Returns "YYYY-MM-DD" or null.
+// Accepts 2025-09-25, 25-09-2025, 25/09/2025, 25.09.2025, 25-Sep-2025, 25 Sep 2025, 25 September, 2025 or September 25, 2025. Returns "YYYY-MM-DD" or null.
 function parseDate(s) {
   s = String(s ?? "").trim();
   let y, m, d, x;
   if ((x = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) [y, m, d] = [+x[1], +x[2], +x[3]];
   else if ((x = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/))) [d, m, y] = [+x[1], +x[2], +x[3]];
   else if ((x = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[A-Za-z]*[-\s,]+(\d{4})$/))) [d, m, y] = [+x[1], MONTHS.indexOf(x[2].toUpperCase()) + 1, +x[3]];
+  else if ((x = s.match(/^([A-Za-z]{3})[A-Za-z]*\.?\s+(\d{1,2}),?\s+(\d{4})$/))) [m, d, y] = [MONTHS.indexOf(x[1].toUpperCase()) + 1, +x[2], +x[3]];
   else return null;
   const dt = new Date(Date.UTC(y, m - 1, d));
   if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
@@ -464,12 +465,18 @@ async function readPdf(file) {
 
 // ---------- Finding the fields in the text that was read ----------
 const GSTIN_RE = /\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]/g;
-const DATE_SRC = "(\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}[-\\/.]\\d{1,2}[-\\/.]\\d{4}|\\d{1,2}[-\\s][A-Za-z]{3,9}[-\\s,]+\\d{4})";
-const BUYER_WORDS  = /bill(ed)?\s*to|buyer|customer|ship\s*to|consignee|invoice\s*to/i;
-const VENDOR_WORDS = /supplier|vendor|seller|sold\s*by|\bfrom\b/i;
+const DATE_SRC = "(\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}[-\\/.]\\d{1,2}[-\\/.]\\d{4}|\\d{1,2}[-\\s][A-Za-z]{3,9}[-\\s,]+\\d{4}|[A-Za-z]{3,9}\\.?\\s+\\d{1,2},?\\s+\\d{4})";
+const BUYER_WORDS  = /bill(ed)?\s*to|buyer|customer|ship(ped)?\s*to|consignee|invoice\s*to/i;
+const VENDOR_WORDS = /supplier|vendor|seller|sold\s*by/i;
 const TOTAL_WORDS  = /total|round\s*off|in\s+words|balance|grand|cgst|sgst|igst|taxable/i;
+const TABLE_HEAD_WORDS = /description|particulars|\bitem\b|\bhsn\b|\bqty\b|quantity/i;
+// A heading on its own ("SUPPLIER", "BILL TO") or with the name after a colon ("Bill To: Sunrise …")
+const HEADING_RE = /^(supplier|vendor|seller|sold\s*by|bill(?:ed)?\s*to|ship(?:ped)?\s*to(?:\s*\/\s*bill(?:ed)?\s*to)?|buyer|customer|consignee)\s*(?:[:\-]\s*(.*))?$/i;
+const DOC_TITLES = /tax\s*invoice|purchase\s*order|^invoice$|original|duplicate|triplicate/i;
 
-const cleanLine = l => l.replace(/[|₹]/g, " ").replace(/\bRs\.?/gi, " ").replace(/\s+/g, " ").trim();
+// Two or more spaces are kept: they separate columns that sit side by side on one line
+const cleanLine = l => l.replace(/[|₹]/g, " ").replace(/\bRs\.?/gi, " ").replace(/\t/g, "  ").replace(/ {3,}/g, "  ").trim();
+const columns = l => l.split(/\s{2,}/).map(c => c.trim()).filter(Boolean);
 
 function valueAfter(lines, labelSrc, valueSrc) {
   const re = new RegExp(labelSrc + "\\s*[:\\-]?\\s*" + valueSrc, "i");
@@ -503,6 +510,37 @@ function findGstins(lines) {
               || unique.find(f => f !== buyer);
   if (!buyer) buyer = unique.find(f => f !== vendor);
   return { vendor: vendor?.g || "", buyer: buyer?.g || "" };
+}
+
+// Names under headings like SUPPLIER / BILL TO (one heading, or two side by side on one line)
+function findNames(lines) {
+  const names = {};
+  const roleOf = h => /supplier|vendor|seller|sold/i.test(h) ? "vendor" : "buyer";
+  const take = (role, name) => {
+    name = (name || "").replace(/\s+/g, " ").replace(/[,:]$/, "").trim();
+    if (!names[role] && /[A-Za-z]{3}/.test(name) && !/gstin|\bpan\b|state|address|contact|plot|road|street/i.test(name)) names[role] = name;
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const whole = lines[i].replace(/\s+/g, " ").match(HEADING_RE);
+    const heads = whole ? [whole] : columns(lines[i]).map(c => c.match(HEADING_RE));
+    if (!heads.length || !heads.every(Boolean)) continue;
+    const next = columns(lines[i + 1] || "");
+    heads.forEach((h, c) => take(roleOf(h[1]), h[2] || (heads.length > 1 ? next[c] : next.join(" "))));
+  }
+  return names;
+}
+
+// The company that issued the document: its letterhead at the top, or "For <company>" above the signature
+function findIssuer(lines) {
+  for (const l of lines.slice(0, 5)) {
+    const s = l.replace(/\s+/g, " ");
+    if (/[A-Za-z]{3}/.test(s) && !DOC_TITLES.test(s) && !/gstin|\bpan\b|plot|road|street|@/i.test(s)) return columns(l)[0];
+  }
+  for (const l of [...lines].reverse()) {
+    const c = columns(l).find(c => /^for\s+[A-Za-z]/i.test(c));
+    if (c) return c.replace(/^for\s+/i, "");
+  }
+  return "";
 }
 
 // Every number on a line, with its position (GSTINs and dates are blanked out first)
@@ -579,13 +617,17 @@ function parseDocument(rawLines, side) {
   const g = findGstins(lines);
   const taxType = /\bCGST\b/i.test(text) ? "cs" : /\bIGST\b/i.test(text) ? "i" : "";
 
+  const names = findNames(lines);
+  const issuer = findIssuer(lines); // a PO is issued by the buyer, an invoice by the vendor
+
   const header = {
     po_no: valueAfter(lines, "(?:\\bP\\.?\\s?O\\.?|Purchase\\s+Order|Order)\\s*(?:No\\.?|Number|#)", "([A-Z0-9][A-Z0-9\\-\\/]*)")
         || valueAfter(lines, "", "\\b(PO[-\\/][A-Z0-9\\-\\/]+)"),
     vendor_gstin: g.vendor,
-    vendor_name: VENDORS.find(v => v.gstin === g.vendor)?.name || "",
+    vendor_name: VENDORS.find(v => v.gstin === g.vendor)?.name || names.vendor || (side === "inv" ? issuer : ""),
     buyer_gstin: g.buyer,
-    buyer_name: text.toUpperCase().includes(COMPANY.name.toUpperCase()) ? COMPANY.name : ""
+    buyer_name: names.buyer || (side === "po" ? issuer : "")
+             || (text.toUpperCase().includes(COMPANY.name.toUpperCase()) ? COMPANY.name : "")
   };
   if (side === "po") {
     header.po_date = findDate(lines, ["P\\.?\\s?O\\.?\\s*Date", "Order\\s*Date", "\\bDated?"]);
@@ -595,7 +637,35 @@ function parseDocument(rawLines, side) {
     header.invoice_date = findDate(lines, ["Invoice\\s*Date", "Inv\\.?\\s*Date", "Bill\\s*Date", "(?<!P\\.?O\\.?\\s|Order\\s|Due\\s)\\bDated?"]);
   }
 
-  const items = lines.map(l => parseItemLine(l, taxType)).filter(Boolean);
+  // A long description can wrap onto lines above and below its numbers ("Ergonomic Office Chair (Mesh" / numbers / "Back)")
+  const rows = lines.map(l => parseItemLine(l, taxType));
+  const at = rows.map((it, i) => it ? i : -1).filter(i => i >= 0);
+  const isStop = l => TOTAL_WORDS.test(l) || TABLE_HEAD_WORDS.test(l);
+  const isText = l => /[A-Za-z]/.test(l) && !isStop(l);
+  const claimed = new Set();
+  const textLines = (from, to, step) => {
+    const out = [];
+    for (let j = from; j !== to && out.length < 3; j += step) {
+      if (isStop(lines[j])) break;
+      if (isText(lines[j]) && !claimed.has(j)) step > 0 ? out.push(j) : out.unshift(j);
+    }
+    return out;
+  };
+  const items = at.map((i, n) => {
+    const it = rows[i];
+    const prev = n ? at[n - 1] : -1, next = n < at.length - 1 ? at[n + 1] : lines.length;
+    let above = [], below = [];
+    if (!it.item) {
+      above = textLines(i - 1, prev, -1);
+      below = textLines(i + 1, next, 1).slice(0, Math.max(above.length, 1));
+    } else if (next === lines.length || rows[next].item) {
+      below = textLines(i + 1, next, 1);
+    }
+    [...above, ...below].forEach(j => claimed.add(j));
+    it.item = [...above.map(j => lines[j]), it.item, ...below.map(j => lines[j])].join(" ")
+      .replace(/^\s*\d+[.)]?\s+/, "").replace(/\s+/g, " ").trim();
+    return it;
+  });
 
   // If the item lines had no tax amounts, use the CGST / SGST / IGST total lines, shared out by amount
   if (side === "inv" && items.length && items.every(it => it.cgst === "" && it.igst === "")) {
