@@ -195,7 +195,7 @@
 
   <section class="card">
     <details>
-      <summary>The rules the app uses (company, vendors, GST rates)</summary>
+      <summary>The rules the app uses (company, GST rates)</summary>
       <div id="rules"></div>
     </details>
   </section>
@@ -206,12 +206,6 @@
 <script>
 // ---------- Lookup data (all fake) ----------
 const COMPANY = { name: "Sunrise Demo Traders Pvt Ltd", gstin: "27AAKCS1234D1ZM" };
-
-const VENDORS = [
-  { name: "Kaveri Paper Mart",      gstin: "27AABCK5678E1ZD" },
-  { name: "Mysore Office Supplies", gstin: "29AAGFM4321P1ZV" },
-  { name: "Patel Packaging Co",     gstin: "24AACCP8765Q1ZM" }
-];
 
 // GST Rates table with Valid From / Valid To (simplified: main slabs only)
 const GST_RATES = [
@@ -507,8 +501,7 @@ function findGstins(lines) {
   }
   const unique = [...new Map(found.map(f => [f.g, f])).values()];
   let buyer = unique.find(f => f.g === COMPANY.gstin) || unique.find(f => f.role === "buyer");
-  const vendor = unique.find(f => f !== buyer && (f.role === "vendor" || VENDORS.some(v => v.gstin === f.g)))
-              || unique.find(f => f !== buyer);
+  const vendor = unique.find(f => f !== buyer && f.role === "vendor") || unique.find(f => f !== buyer);
   if (!buyer) buyer = unique.find(f => f !== vendor);
   return { vendor: vendor?.g || "", buyer: buyer?.g || "" };
 }
@@ -518,7 +511,8 @@ function findNames(lines) {
   const names = {};
   const roleOf = h => /supplier|vendor|seller|sold/i.test(h) ? "vendor" : "buyer";
   const take = (role, name) => {
-    name = (name || "").replace(/\s+/g, " ").replace(/[,:]$/, "").trim();
+    // "Kaveri Paper Mart, Nashik, Maharashtra": the name ends where the address starts
+    name = (name || "").split(",")[0].replace(/\s+/g, " ").replace(/[:]$/, "").trim();
     if (!names[role] && /[A-Za-z]{3}/.test(name) && !/gstin|\bpan\b|state|address|contact|plot|road|street/i.test(name)) names[role] = name;
   };
   for (let i = 0; i < lines.length; i++) {
@@ -625,7 +619,7 @@ function parseDocument(rawLines, side) {
     po_no: valueAfter(lines, "(?:\\bP\\.?\\s?O\\.?|Purchase\\s+Order|Order)\\s*(?:No\\.?|Number|#)", "([A-Z0-9][A-Z0-9\\-\\/]*)")
         || valueAfter(lines, "", "\\b(PO[-\\/][A-Z0-9\\-\\/]+)"),
     vendor_gstin: g.vendor,
-    vendor_name: VENDORS.find(v => v.gstin === g.vendor)?.name || names.vendor || (side === "inv" ? issuer : ""),
+    vendor_name: names.vendor || (side === "inv" ? issuer : ""),
     buyer_gstin: g.buyer,
     buyer_name: names.buyer || (side === "po" ? issuer : "")
              || (text.toUpperCase().includes(COMPANY.name.toUpperCase()) ? COMPANY.name : "")
@@ -832,9 +826,6 @@ function runChecks(po, inv) {
     if (I.vendor_gstin !== P.vendor_gstin) issues.push("vendor GSTIN on the invoice is different from the PO");
     if (!sameName(I.vendor_name, P.vendor_name)) issues.push("vendor name on the invoice is different from the PO");
     if (!gstinValid(I.vendor_gstin)) notes.push("this GSTIN is not valid (format or check digit), so confirm it with the vendor");
-    const v = VENDORS.find(v => v.gstin === I.vendor_gstin);
-    if (!v) notes.push("this vendor is not in the vendor list");
-    else if (!sameName(v.name, I.vendor_name)) notes.push(`vendor list says this GSTIN belongs to ${v.name}`);
     results.push({
       name: "GSTIN", issues, notes,
       okText: "Vendor name and GSTIN are the same on the PO and the invoice",
@@ -1102,7 +1093,6 @@ $("checkBtn").addEventListener("click", () => {
     return t;
   };
   r.appendChild(table(["Our company", "GSTIN"], [[COMPANY.name, COMPANY.gstin]]));
-  r.appendChild(table(["Vendor", "GSTIN"], VENDORS.map(v => [v.name, v.gstin])));
   r.appendChild(table(["GST rates", "Valid from", "Valid to"],
     GST_RATES.map(s => [s.rates.map(x => x + "%").join(", "), showDate(s.from), s.to ? showDate(s.to) : "—"])));
 })();

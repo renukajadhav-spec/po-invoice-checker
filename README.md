@@ -29,7 +29,7 @@ Fake test documents are in [`samples/`](samples/): `po-1001.pdf` + `invoice-501.
 ## The 6 checks
 | Check | Passes when |
 |---|---|
-| GSTIN | Vendor name and GSTIN are the same on the PO and the invoice. ⚠ Note (does not fail): GSTIN check digit is wrong, or the vendor is not in the vendor list |
+| GSTIN | Vendor name and GSTIN are the same on the PO and the invoice. ⚠ Note (does not fail): GSTIN check digit is wrong |
 | Company details | Buyer name and GSTIN are the same on the PO and the invoice. ⚠ Note (does not fail): buyer GSTIN is not valid, or the buyer is not our company |
 | GST rate | Same rate as the PO, and the rate is valid on the invoice date |
 | GST calculation | Amount × rate = tax; CGST + SGST for the same state, IGST for another state (₹1 rounding allowed) |
@@ -40,7 +40,6 @@ All 6 pass → **Ready for manager approval**. Any fail → **Hold, follow up wi
 
 ## Built-in rules (fake)
 - Our company: Sunrise Demo Traders Pvt Ltd, `27AAKCS1234D1ZM` (Maharashtra)
-- Vendors: Kaveri Paper Mart, Mysore Office Supplies, Patel Packaging Co
 - GST rates: 0/5/12/18/28% up to 21 Sep 2025; 0/5/18/40% from 22 Sep 2025 (main slabs only)
 
 ## Samples
