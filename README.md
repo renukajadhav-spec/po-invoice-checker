@@ -35,8 +35,6 @@ The app then looks for the fields in the text: PO / invoice number and date next
 
 **Limits:** clear, typed documents work best. Blurry photos, handwriting or unusual tables need more fixing in the review step (in testing, OCR once read `29…` as `20…` in a GSTIN). Reading PDFs and images needs internet to load the readers, and the first image downloads an English language file (about 10 MB, then cached). Files are never uploaded anywhere; everything runs in the browser.
 
-Fake test documents are in [`samples/`](samples/): `po-1001.pdf` + `invoice-501.pdf` (expect 6/6 ✓) and `po-1002.pdf` + `invoice-m-207.png` (expect ✗ over-billing, qty 13 vs 12).
-
 ## The 6 checks
 | Check | Passes when |
 |---|---|
