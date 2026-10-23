@@ -1030,7 +1030,7 @@ function runChecks(po, inv) {
     });
   }
 
-  // 6. PO–invoice match
+  // 6. Items: same PO, every item ordered, rate as agreed, qty not more than ordered
   {
     const issues = [];
     if (norm(I.po_no) !== norm(P.po_no)) issues.push(`invoice is for ${I.po_no}, but this PO is ${P.po_no}`);
@@ -1046,7 +1046,7 @@ function runChecks(po, inv) {
       if (p && qtyByItem[k] > p.qty) issues.push(`${p.item}: invoice qty ${qtyByItem[k]} is more than PO qty ${p.qty} (over-billing)`);
     }
     results.push({
-      name: "PO–invoice match", issues: [...new Set(issues)],
+      name: "Items", issues: [...new Set(issues)],
       okText: "Same PO, items, rates, and qty within the PO",
       po: [P.po_no].concat(po.map(l => `${l.item}: ${l.qty} × ${money(l.rate)}`)),
       inv: [`${I.po_no} (invoice ${I.invoice_no})`].concat(inv.map(l => `${l.item}: ${l.qty} × ${money(l.rate)}`))
