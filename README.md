@@ -45,7 +45,7 @@ Fake test documents are in [`samples/`](samples/): `po-1001.pdf` + `invoice-501.
 | GST rate | Same rate as the PO, and the rate is valid on the invoice date |
 | GST calculation | Amount × rate = tax; CGST + SGST for the same state, IGST for another state (₹1 rounding allowed) |
 | Qty × rate | Qty × rate = amount on every line |
-| PO–invoice match | Same PO number, every item is on the PO, same rate, invoice qty not more than PO qty |
+| Items | Same PO number, every item is on the PO, same rate, invoice qty not more than PO qty |
 
 All 6 pass → **Ready for manager approval**. Any fail → **Hold, follow up with vendor**.
 
