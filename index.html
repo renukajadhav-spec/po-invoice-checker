@@ -950,26 +950,26 @@ function runChecks(po, inv) {
   // Names compare without dots, commas and extra spaces ("Pvt. Ltd." = "Pvt Ltd")
   const sameName = (a, b) => norm(a).replace(/[.,]/g, "").replace(/\s+/g, " ") === norm(b).replace(/[.,]/g, "").replace(/\s+/g, " ");
 
-  // 1. GSTIN: pass when the invoice vendor matches the PO vendor
+  // 1. Vendor details: pass when the invoice vendor matches the PO vendor
   {
     const issues = [];
     if (I.vendor_gstin !== P.vendor_gstin) issues.push("vendor GSTIN on the invoice is different from the PO");
     if (!sameName(I.vendor_name, P.vendor_name)) issues.push("vendor name on the invoice is different from the PO");
     results.push({
-      name: "GSTIN", issues,
+      name: "Vendor details", issues,
       okText: "Vendor name and GSTIN are the same on the PO and the invoice",
       po: [P.vendor_name, P.vendor_gstin],
       inv: [I.vendor_name, I.vendor_gstin]
     });
   }
 
-  // 2. Company details: pass when the invoice is billed to the same buyer as the PO
+  // 2. Buyer details: pass when the invoice is billed to the same buyer as the PO
   {
     const issues = [];
     if (!sameName(I.buyer_name, P.buyer_name)) issues.push("buyer name on the invoice is different from the PO");
     if (I.buyer_gstin !== P.buyer_gstin) issues.push("buyer GSTIN on the invoice is different from the PO");
     results.push({
-      name: "Company details", issues,
+      name: "Buyer details", issues,
       okText: "Buyer name and GSTIN are the same on the PO and the invoice",
       po: [P.buyer_name, P.buyer_gstin],
       inv: [I.buyer_name, I.buyer_gstin]
