@@ -5,6 +5,15 @@ The app flags and holds. The manager approves.
 
 **Fake data only.** All names, GSTINs and amounts in this repo are made up.
 
+## Login
+The app opens with a **Sign in** screen (email + password). Sign-in is handled by **Supabase Auth** (project `training`).
+
+- **Add a user:** Supabase → Authentication → Users → **Add user → Create new user**, enter email + password, tick **Auto Confirm User**.
+- **Public sign-up is off**, so only users added this way can sign in.
+- **Who opened it:** Supabase → Authentication → Users shows each person's **Last sign in**.
+- No password is stored in this repo. The page uses only the Supabase **publishable** key, which is meant to be public; the secret key is never used.
+- Limit: the login hides the app screen, but the page code is public in this repo. That's fine here because the app keeps no data and files never leave the browser.
+
 ## How to use it
 1. Open the live link: https://renukajadhav-spec.github.io/po-invoice-checker/ (or `index.html` in a browser).
 2. Choose a PO file and an invoice file, each as **CSV, PDF or image (JPG/PNG)**, or pick **Try a sample**.
