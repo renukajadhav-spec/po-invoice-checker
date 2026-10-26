@@ -26,7 +26,7 @@ Live link: https://renukajadhav-spec.github.io/po-invoice-checker/
 2. Sign in, then choose a PO file and an invoice file, each as **CSV, PDF or image (JPG/PNG)**.
 3. **Review what was read** and correct anything wrong; red boxes are empty and need filling in.
 4. Click **Check** and see the summary plus a table: **Check / Status / PO says / Invoice says**.
-5. Every check is saved to **History** (step 5), which all signed-in users can see. Search it, filter Hold only, click a row for the reasons, or **Download CSV** for Excel.
+5. Every check is saved to **History** (step 5), which all signed-in users can see. Search it, filter Hold only, click a row for the reasons, or **Download Excel** (.xlsx).
 6. **Print / Save as PDF** a result, and see the **Dashboard** for any date range.
 7. **Re-check** a Hold from History once the PO or invoice is corrected.
 8. **Approve or reject** a Ready check in the History **Approval** column (Reject needs a reason).
@@ -40,6 +40,7 @@ Fake test files: `samples/po-1001.pdf` + `samples/invoice-501.pdf` (expect 7/7 â
 | CSV | Read directly |
 | PDF with typed text | [pdf.js](https://mozilla.github.io/pdf.js/) (free, by Mozilla) |
 | Image, or a scanned PDF | [Tesseract.js](https://tesseract.projectnaptha.com/) OCR (free text recognition) |
+| History download (Excel) | [SheetJS](https://sheetjs.com/) (free, makes the .xlsx file in the browser) |
 
 Clear, typed documents work best. Files are never uploaded anywhere; everything runs in the browser.
 

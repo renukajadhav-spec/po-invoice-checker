@@ -28,7 +28,7 @@ All test data is fake. The sample files are in [`samples/`](../samples/).
 | 22 | Older row details | Click a row saved before details existed | "Details were not saved for this older check." | | |
 | 23 | Search | Type part of a PO number | Only matching rows; clear the box → all rows back | | |
 | 24 | Hold only | Tick Hold only | Only Hold rows | | |
-| 25 | Download CSV | Click Download CSV, open in Excel | Columns correct, names and ₹ readable, same rows as the search shows | | |
+| 25 | Download Excel | Click Download Excel, open the .xlsx | One row per check, proper columns with filter arrows, dates sortable, same rows as the search shows | | |
 | 26 | Print / Save as PDF | After a check, click Print / Save as PDF | One white page: result only, checked by + date, footer | | |
 | 27 | Dashboard, this month | Compare with this month's rows in Supabase | Checks, Ready %, Hold %, most common failed check all match | | |
 | 28 | Dashboard, all time | Period: All time | Checks = number of rows in Supabase | | |
@@ -39,10 +39,11 @@ All test data is fake. The sample files are in [`samples/`](../samples/).
 | 33 | Re-check, corrected file | Re-check → upload a corrected invoice file in step 1 → Check | Only the invoice side is replaced; new row still linked to the old one | | |
 | 34 | Cancel re-check | Re-check → Cancel re-check → Check | Banner gone; new row is a normal check (no "Re-check of") | | |
 | 35 | Older row | Row saved before Re-check existed | "—" in the Re-check column, no button | | |
-| 36 | CSV with re-checks | Download CSV after test 32 | ID and Re-check of ID columns link the two rows | | |
+| 36 | Excel with re-checks | Download Excel after test 32 | ID and Re-check of ID columns link the two rows | | |
 | 37 | Approve | Ready row → ✓ Approve | "✓ Approved by <email> · <time>"; same in Supabase | | |
 | 38 | Reject, no reason | Ready row → ✗ Reject → Confirm reject with empty box | Red box, not saved | | |
 | 39 | Reject with reason | Type a reason → Confirm reject | "✗ Rejected", by, time and "Reason: …" | | |
 | 40 | Change decision | Change → Approve on a rejected row | Now "✓ Approved"; the reject is replaced | | |
 | 41 | Hold row | Look at a Hold row's Approval column | "Fix and re-check first", no buttons | | |
-| 42 | CSV approval | Download CSV after tests 37–40 | Approval, Approved by, Approved on, Approval note filled | | |
+| 42 | Excel approval | Download Excel after tests 37–40 | Approval, Approved by, Approved on, Approval note filled | | |
+| 43 | History fits the screen | Laptop, normal browser size | All 6 History columns visible, no sideways scroll | | |

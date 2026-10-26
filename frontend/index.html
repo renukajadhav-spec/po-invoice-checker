@@ -129,7 +129,7 @@
     <div class="cardhead">
       <h2>5. History</h2>
       <div class="buttons">
-        <button type="button" class="small" id="historyCsv">Download CSV</button>
+        <button type="button" class="small" id="historyExcel">Download Excel</button>
         <button type="button" class="small" id="historyRefresh">Refresh</button>
       </div>
     </div>
@@ -137,10 +137,11 @@
     <div class="historytools">
       <input class="edit" type="search" id="historySearch" placeholder="Search PO or invoice no." aria-label="Search PO or invoice number">
       <label class="tick"><input type="checkbox" id="holdOnly"> Hold only</label>
+      <span class="note" id="historyMsg"></span>
     </div>
     <div class="tablewrap">
-      <table>
-        <thead><tr><th>Checked on</th><th>PO no.</th><th>Invoice</th><th>Vendor</th><th>Result</th><th>Failed checks</th><th>Checked by</th><th>Approval</th><th>Re-check</th></tr></thead>
+      <table class="history">
+        <thead><tr><th>Checked</th><th>PO / Invoice</th><th>Vendor</th><th>Result</th><th>Approval</th><th>Re-check</th></tr></thead>
         <tbody id="historyRows"></tbody>
       </table>
     </div>

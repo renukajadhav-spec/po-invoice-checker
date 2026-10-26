@@ -112,7 +112,8 @@ function recordsToDoc(records, side) {
 const LIBS = {
   pdf:       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",
   pdfWorker: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js",
-  ocr:       "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"
+  ocr:       "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js",
+  xlsx:      "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"  // SheetJS, only writes the History Excel file
 };
 const scriptLoads = {};
 function loadScript(src) {
@@ -975,7 +976,11 @@ function subLine(td, text) {
   d.className = "sub";
   d.textContent = text;
   td.appendChild(d);
+  return d;
 }
+
+// "renukajadhav334" from "renukajadhav334@gmail.com", to keep History narrow
+const shortName = email => String(email || "").split("@")[0];
 
 // ---------- Re-check: load a saved PO and invoice back into step 2 ----------
 function startRecheck(h) {
@@ -1046,7 +1051,7 @@ function showDecision(td, h) {
   d.className = "decision " + (ok ? "ok" : "no");
   d.textContent = ok ? "✓ Approved" : "✗ Rejected";
   td.appendChild(d);
-  subLine(td, `by ${h.approved_by_email} · ${showTime(h.approved_at)}`);
+  subLine(td, `by ${shortName(h.approved_by_email)} · ${showTime(h.approved_at)}`).title = h.approved_by_email;
   if (h.approval_note) subLine(td, `Reason: ${h.approval_note}`);
   td.appendChild(smallButton("Change", "change-btn", () => showDecideButtons(td, h)));
 }
@@ -1099,7 +1104,7 @@ function detailRow(h) {
   const tr = document.createElement("tr");
   tr.className = "detail";
   const td = tr.insertCell();
-  td.colSpan = 9;
+  td.colSpan = 6;
   if (!h.details) {
     td.className = "empty";
     td.textContent = "Details were not saved for this older check.";
@@ -1126,7 +1131,7 @@ async function loadHistory() {
   const message = text => {
     body.replaceChildren();
     const td = body.insertRow().insertCell();
-    td.colSpan = 9;
+    td.colSpan = 6;
     td.className = "empty";
     td.textContent = text;
   };
@@ -1161,21 +1166,23 @@ async function loadHistory() {
     };
     tr.addEventListener("click", toggle);
     tr.addEventListener("keydown", e => { if (e.target === tr && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggle(); } });
+    // 6 columns so the table fits one screen: related details share a cell
     const when = cell([showTime(h.checked_at)]);
+    subLine(when, "by " + shortName(h.checked_by_email)).title = h.checked_by_email;
     if (h.rechecked_from) subLine(when, origTime.has(h.rechecked_from) ? `Re-check of ${showTime(origTime.get(h.rechecked_from))}` : "Re-check");
     tr.appendChild(when);
-    tr.appendChild(cell([h.po_no]));
-    tr.appendChild(cell([h.invoice_no, showDate(h.invoice_date)]));
+    const doc = cell([h.po_no, h.invoice_no]);
+    subLine(doc, showDate(h.invoice_date));
+    tr.appendChild(doc);
     tr.appendChild(cell([h.vendor_name]));
     const st = cell([], "pass " + (hold ? "hold" : "ok"));
     const badge = document.createElement("span");
     badge.className = "badge";
     badge.textContent = resultText(h);
     st.appendChild(badge);
+    h.failed_checks.forEach(c => subLine(st, "✗ " + c).classList.add("failed"));
     if (latest.has(h.id)) subLine(st, `Re-checked → ${resultText(latest.get(h.id))}`);
     tr.appendChild(st);
-    tr.appendChild(cell(h.failed_checks.length ? h.failed_checks : ["—"]));
-    tr.appendChild(cell([h.checked_by_email]));
     tr.appendChild(approvalCell(h));
     tr.appendChild(recheckCell(h));
   });
@@ -1186,36 +1193,68 @@ $("historySearch").addEventListener("input", () => { clearTimeout(searchTimer); 
 $("holdOnly").addEventListener("change", loadHistory);
 $("historyRefresh").addEventListener("click", refreshHistory);
 
-// ---------- Download history as CSV (opens in Excel) ----------
-// Quotes around cells with commas, quotes or line breaks; a ' in front of = + - @ so Excel never runs a cell as a formula
-function csvCell(v) {
-  let s = String(v ?? "");
-  if (/^[=+\-@]/.test(s)) s = "'" + s;
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
+// ---------- Download history as an Excel file (.xlsx) ----------
+const DATE_TIME = "dd-mmm-yyyy hh:mm AM/PM", DATE_ONLY = "dd-mmm-yyyy";
+
+// One entry per Excel column: heading, width (characters), value for a history row, date format if a date
+const EXCEL_COLUMNS = [
+  ["ID", 6, h => h.id],
+  ["Checked on", 21, h => new Date(h.checked_at), DATE_TIME],
+  ["Checked by", 28, h => h.checked_by_email],
+  ["PO no.", 22, h => h.po_no],
+  ["Invoice no.", 20, h => h.invoice_no],
+  ["Invoice date", 13, h => localDay(h.invoice_date), DATE_ONLY],
+  ["Vendor", 30, h => h.vendor_name],
+  ["Passed", 8, h => h.passed],
+  ["Total", 7, h => h.total],
+  ["Result", 8, h => h.verdict === "Hold" ? "Hold" : "Ready"],
+  ["Failed checks", 26, h => h.failed_checks.join(", ")],
+  ["Reasons", 60, h => (h.details || []).flatMap(d => d.issues.map(t => `${d.name}: ${t}`)).join("; ")],
+  ["Re-check of ID", 14, h => h.rechecked_from ?? ""],
+  ["Approval", 11, h => h.approval || (h.verdict === "Hold" ? "" : "Waiting")],
+  ["Approved by", 28, h => h.approved_by_email || ""],
+  ["Approved on", 21, h => h.approved_at ? new Date(h.approved_at) : "", DATE_TIME],
+  ["Approval note", 40, h => h.approval_note || ""]
+];
+
+// Excel keeps a date as a number of days since 30 Dec 1899; local time, so it matches the app
+const excelDate = d => (d.getTime() - d.getTimezoneOffset() * 60000) / 86400000 + 25569;
 
 async function downloadHistory() {
-  const note = $("historyNote");
+  const msg = $("historyMsg");
+  msg.textContent = "Preparing the Excel file…";
+  try {
+    await loadScript(LIBS.xlsx);
+  } catch {
+    msg.textContent = "Could not load the Excel maker. Check your internet connection and try again.";
+    return;
+  }
   const { data, error } = await historyQuery(1000);
-  if (error) { note.textContent = "Could not download the history: " + error.message; return; }
-  const head = ["ID", "Checked on", "PO no.", "Invoice no.", "Invoice date", "Vendor", "Passed", "Total", "Verdict", "Failed checks", "Reasons", "Checked by", "Re-check of ID", "Approval", "Approved by", "Approved on", "Approval note"];
-  const rows = data.map(h => [
-    h.id, showTime(h.checked_at), h.po_no, h.invoice_no, showDate(h.invoice_date), h.vendor_name, h.passed, h.total, h.verdict,
-    h.failed_checks.join("; "),
-    (h.details || []).flatMap(d => d.issues.map(t => `${d.name}: ${t}`)).join("; "),
-    h.checked_by_email, h.rechecked_from,
-    h.approval, h.approved_by_email, h.approved_at ? showTime(h.approved_at) : "", h.approval_note
-  ]);
-  // "\uFEFF" tells Excel the file is UTF-8, so ₹ and names show correctly
-  const text = "\uFEFF" + [head, ...rows].map(r => r.map(csvCell).join(",")).join("\r\n");
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
-  a.download = `check-history-${new Date().toLocaleDateString("en-CA")}.csv`;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  if (error) { msg.textContent = "Could not download the history: " + error.message; return; }
+
+  const rows = [EXCEL_COLUMNS.map(c => c[0])].concat(data.map(h => EXCEL_COLUMNS.map(([, , get]) => {
+    const v = get(h);
+    return v instanceof Date ? excelDate(v) : v;
+  })));
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  // Show the date numbers as dates
+  EXCEL_COLUMNS.forEach(([, , , format], c) => {
+    if (!format) return;
+    for (let r = 1; r < rows.length; r++) {
+      const cellRef = ws[XLSX.utils.encode_cell({ r, c })];
+      if (cellRef && cellRef.t === "n") cellRef.z = format;
+    }
+  });
+  ws["!cols"] = EXCEL_COLUMNS.map(c => ({ wch: c[1] }));
+  ws["!autofilter"] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length - 1, c: EXCEL_COLUMNS.length - 1 } }) };
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "History");
+  XLSX.writeFile(wb, `check-history-${new Date().toLocaleDateString("en-CA")}.xlsx`);
+  msg.textContent = `✓ Downloaded ${data.length} check${data.length === 1 ? "" : "s"} to Excel.`;
 }
 
-$("historyCsv").addEventListener("click", downloadHistory);
+$("historyExcel").addEventListener("click", downloadHistory);
 
 // ---------- Dashboard: checks in the chosen period ----------
 const ymd = d => d.toLocaleDateString("en-CA"); // local date as YYYY-MM-DD

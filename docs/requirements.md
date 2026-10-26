@@ -13,7 +13,7 @@ The app flags and holds. The manager approves.
 3. Reviews what the app read and corrects anything wrong. Empty required boxes show in red.
 4. Clicks **Check** and sees a summary plus a table: Check / Status / PO says / Invoice says. **Print / Save as PDF** gives one clean page of the result, with who checked it and when.
 5. Sees the **Dashboard** for the chosen period (default this month; also last month, last 7 / 30 days, this year, all time or custom From–To dates): number of checks, % Ready, % Hold, most common failed check.
-6. Sees the **History**: every check by any signed-in user, newest first (latest 50). Can search by PO or invoice number, tick **Hold only**, click a row to see each check's reasons, and **Download CSV** to open it in Excel.
+6. Sees the **History**: every check by any signed-in user, newest first (latest 50). Can search by PO or invoice number, tick **Hold only**, click a row to see each check's reasons, and **Download Excel** (.xlsx: one row per check, real dates, filter arrows on the header row).
 7. **Re-checks** a corrected PO or invoice: the **↻ Re-check** button in the last History column fills step 2 with the saved PO and invoice. The user corrects the boxes or uploads the corrected file, then clicks Check. The new row says "Re-check of <date>", and the old row shows "Re-checked → <result>".
 8. **Approves or rejects** a Ready check in the **Approval** column of History. Reject needs a reason. The decision shows who decided and when, and can be changed (the latest decision replaces the old one). Hold rows show "Fix and re-check first". Any signed-in user can approve, so a user could approve their own check; a manager role can be added later.
 
