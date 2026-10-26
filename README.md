@@ -41,7 +41,7 @@ Fake test files: `samples/po-1001.pdf` + `samples/invoice-501.pdf` (expect 6/6 �
 Clear, typed documents work best. Files are never uploaded anywhere; everything runs in the browser.
 
 ## Login
-Sign-in is handled by **Supabase Auth** (project `training`).
+Sign-in and check history use the Supabase project **`po-invoice-checker`**.
 - **Add a user:** Supabase → Authentication → Users → **Add user → Create new user**, enter email + password, tick **Auto Confirm User**.
 - **Public sign-up is off**, so only users added this way can sign in.
 - **Who opened it:** Supabase → Authentication → Users shows each person's **Last sign in**.

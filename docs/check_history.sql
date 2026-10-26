@@ -16,6 +16,10 @@ create table public.check_history (
   failed_checks    text[] not null default '{}'
 );
 
+-- Open the table to signed-in users only (new tables are not exposed automatically).
+-- No update or delete is granted.
+grant select, insert on public.check_history to authenticated;
+
 -- Row Level Security: only the rules below are allowed
 alter table public.check_history enable row level security;
 

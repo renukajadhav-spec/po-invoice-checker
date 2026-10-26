@@ -855,8 +855,8 @@ $("checkBtn").addEventListener("click", () => {
 
 // ---------- Login (Supabase Auth) ----------
 // The publishable key is meant to be public; Supabase checks the email and password on its own server.
-const SUPABASE_URL = "https://mbormqyxqiwmbceufmmn.supabase.co";
-const SUPABASE_KEY = "sb_publishable_nEgw9AKlQAXCazrC6UtdfQ_yumbBymq";
+const SUPABASE_URL = "https://zdfnvemxhwkldquqkniod.supabase.co";
+const SUPABASE_KEY = "sb_publishable_6sXqMklXanBF4n_yUgc3Xg_4ZHwpF8k";
 const db = window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function showLoginError(msg) {
