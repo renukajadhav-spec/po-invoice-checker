@@ -26,7 +26,7 @@ const NICE = {
   item: "Item", hsn: "HSN", qty: "Qty", rate: "Rate", amount: "Amount", gst_rate: "GST %",
   cgst: "CGST", sgst: "SGST", igst: "IGST"
 };
-const OPTIONAL = ["po_date", "hsn", "cgst", "sgst", "igst"];
+const OPTIONAL = ["hsn", "cgst", "sgst", "igst"];
 const NUMBER_FIELDS = ["qty", "rate", "amount", "gst_rate", "cgst", "sgst", "igst"];
 
 // ---------- Small helpers ----------
@@ -545,11 +545,13 @@ function collectSide(side) {
   });
 }
 
-// ---------- The 6 checks ----------
+// ---------- The 7 checks ----------
 function runChecks(po, inv) {
   const P = po[0], I = inv[0];
   const invDate = parseDate(I.invoice_date);
   if (!invDate) throw new Error(`The invoice date "${I.invoice_date}" is not a date I can read. Use a format like 25-09-2025.`);
+  const poDate = parseDate(P.po_date);
+  if (!poDate) throw new Error(`The PO date "${P.po_date}" is not a date I can read. Use a format like 25-09-2025.`);
 
   const poByItem = {};
   po.forEach(l => poByItem[norm(l.item)] = l);
@@ -660,6 +662,17 @@ function runChecks(po, inv) {
       okText: "Same PO, items, rates, and qty within the PO",
       po: [P.po_no].concat(po.map(l => `${l.item}: ${l.qty} × ${money(l.rate)}`)),
       inv: [`${I.po_no} (invoice ${I.invoice_no})`].concat(inv.map(l => `${l.item}: ${l.qty} × ${money(l.rate)}`))
+    });
+  }
+
+  // 7. Dates: the invoice cannot be dated before its PO (same day is fine)
+  {
+    const issues = invDate < poDate ? [`invoice dated ${showDate(invDate)} is before the PO date ${showDate(poDate)}`] : [];
+    results.push({
+      name: "Dates", issues,
+      okText: "Invoice is dated on or after the PO date",
+      po: [`PO date: ${showDate(poDate)}`],
+      inv: [`Invoice date: ${showDate(invDate)}`]
     });
   }
 

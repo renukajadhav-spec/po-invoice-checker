@@ -13,7 +13,8 @@ create table public.check_history (
   passed           int  not null,
   total            int  not null,
   verdict          text not null,
-  failed_checks    text[] not null default '{}'
+  failed_checks    text[] not null default '{}',
+  details          jsonb  -- each check's name and reasons: [{"name": "Items", "issues": ["..."]}]
 );
 
 -- Open the table to signed-in users only (new tables are not exposed automatically).
