@@ -28,7 +28,10 @@
   <div id="app" hidden>
   <div class="userbar">
     <span>Signed in as <b id="userEmail"></b></span>
-    <button type="button" class="small" id="signOutBtn">Sign out</button>
+    <div class="buttons">
+      <button type="button" class="small" id="guideShow" hidden>Show guide</button>
+      <button type="button" class="small" id="signOutBtn">Sign out</button>
+    </div>
   </div>
 
   <section class="card">
@@ -61,6 +64,10 @@
 
   <section class="card" id="review">
     <h2>2. Review what was read</h2>
+    <div class="recheck" id="recheckBanner" hidden>
+      <span id="recheckText"></span>
+      <button type="button" class="small" id="recheckCancel">Cancel re-check</button>
+    </div>
     <p class="note" style="margin-top:-6px">Correct anything the app read wrongly. Boxes in red are empty and need filling in.</p>
     <div class="side" id="review-po"></div>
     <div class="side" id="review-inv"></div>
@@ -76,7 +83,7 @@
     <div class="verdict">
       <div class="score" id="score">
         <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="track" cx="60" cy="60" r="52"/><circle class="bar" id="scoreBar" cx="60" cy="60" r="52"/></svg>
-        <div class="score-num"><b id="scoreNum">0</b><span id="scoreOf">/ 6</span></div>
+        <div class="score-num"><b id="scoreNum">0</b><span id="scoreOf">/ 7</span></div>
       </div>
       <div class="summary" id="summary"></div>
     </div>
@@ -87,18 +94,57 @@
         <tbody id="resultRows"></tbody>
       </table>
     </div>
-    <p class="note" id="historyNote"></p>
+    <p class="printonly" id="printedBy"></p>
+    <div class="cardfoot noprint">
+      <button type="button" class="small" id="printBtn">Print / Save as PDF</button>
+      <span class="note" id="historyNote"></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Dashboard</h2>
+    <div class="dashtools">
+      <label>Period
+        <select class="edit" id="dashPeriod">
+          <option value="month">This month</option>
+          <option value="lastMonth">Last month</option>
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="year">This year</option>
+          <option value="all">All time</option>
+          <option value="custom">Custom</option>
+        </select>
+      </label>
+      <label>From <input class="edit" type="date" id="dashFrom"></label>
+      <label>To <input class="edit" type="date" id="dashTo"></label>
+    </div>
+    <div class="tiles">
+      <div class="tile"><div class="k">Checks</div><div class="v" id="dashChecks">—</div></div>
+      <div class="tile mark ok"><div class="k">Ready</div><div class="v" id="dashReady">—</div><div class="s" id="dashReadyN"></div></div>
+      <div class="tile mark hold"><div class="k">Hold</div><div class="v" id="dashHold">—</div><div class="s" id="dashHoldN"></div></div>
+      <div class="tile"><div class="k">Most common failed check</div><div class="v text" id="dashTop">—</div><div class="s" id="dashTopN"></div></div>
+    </div>
+    <p class="note" id="dashRange"></p>
+    <p class="note" id="dashNote"></p>
   </section>
 
   <section class="card">
     <div class="cardhead">
       <h2>5. History</h2>
-      <button type="button" class="small" id="historyRefresh">Refresh</button>
+      <div class="buttons">
+        <button type="button" class="small" id="historyExcel">Download Excel</button>
+        <button type="button" class="small" id="historyRefresh">Refresh</button>
+      </div>
     </div>
-    <p class="note" style="margin-top:-6px">Every check by anyone, newest first (latest 50).</p>
+    <p class="note" style="margin-top:-6px">Every check by anyone, newest first (latest 50). Click a row to see the reasons.</p>
+    <div class="historytools">
+      <input class="edit" type="search" id="historySearch" placeholder="Search PO or invoice no." aria-label="Search PO or invoice number">
+      <label class="tick"><input type="checkbox" id="holdOnly"> Hold only</label>
+      <span class="note" id="historyMsg"></span>
+    </div>
     <div class="tablewrap">
-      <table>
-        <thead><tr><th>Checked on</th><th>PO no.</th><th>Invoice</th><th>Vendor</th><th>Result</th><th>Failed checks</th><th>Checked by</th></tr></thead>
+      <table class="history">
+        <thead><tr><th>Checked</th><th>PO / Invoice</th><th>Vendor</th><th>Result</th><th>Approval</th><th>Re-check</th></tr></thead>
         <tbody id="historyRows"></tbody>
       </table>
     </div>
@@ -110,6 +156,13 @@
       <div id="rules"></div>
     </details>
   </section>
+
+  <!-- Next step guide: fixed at the bottom of the screen, changes as the user goes -->
+  <div class="guide" id="guide" role="status" aria-live="polite">
+    <div class="guide-text"><b id="guideStep"></b> <span id="guideText"></span></div>
+    <button type="button" class="small" id="guideGo"></button>
+    <button type="button" class="guide-x" id="guideClose" aria-label="Hide the guide" title="Hide the guide">×</button>
+  </div>
   </div>
 
   <footer>The app flags and holds. The manager approves.</footer>
