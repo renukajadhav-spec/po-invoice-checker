@@ -30,4 +30,8 @@ All test data is fake. The sample files are in [`samples/`](../samples/).
 | 24 | Hold only | Tick Hold only | Only Hold rows | | |
 | 25 | Download CSV | Click Download CSV, open in Excel | Columns correct, names and ₹ readable, same rows as the search shows | | |
 | 26 | Print / Save as PDF | After a check, click Print / Save as PDF | One white page: result only, checked by + date, footer | | |
-| 27 | Dashboard | Compare with this month's rows in Supabase | Checks, Ready %, Hold %, most common failed check all match | | |
+| 27 | Dashboard, this month | Compare with this month's rows in Supabase | Checks, Ready %, Hold %, most common failed check all match | | |
+| 28 | Dashboard, all time | Period: All time | Checks = number of rows in Supabase | | |
+| 29 | Dashboard, last month | Period: Last month (no checks then) | 0 checks, "No checks in this period." | | |
+| 30 | Dashboard, custom | Change From or To | Period switches to Custom; whole To day is counted | | |
+| 31 | Dashboard, wrong range | From after To | "From date must be on or before the To date", tiles unchanged | | |

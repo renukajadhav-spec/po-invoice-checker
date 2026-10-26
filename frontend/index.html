@@ -95,16 +95,29 @@
   </section>
 
   <section class="card">
-    <div class="cardhead">
-      <h2>Dashboard</h2>
-      <span class="note" id="dashMonth"></span>
+    <h2>Dashboard</h2>
+    <div class="dashtools">
+      <label>Period
+        <select class="edit" id="dashPeriod">
+          <option value="month">This month</option>
+          <option value="lastMonth">Last month</option>
+          <option value="7">Last 7 days</option>
+          <option value="30">Last 30 days</option>
+          <option value="year">This year</option>
+          <option value="all">All time</option>
+          <option value="custom">Custom</option>
+        </select>
+      </label>
+      <label>From <input class="edit" type="date" id="dashFrom"></label>
+      <label>To <input class="edit" type="date" id="dashTo"></label>
     </div>
     <div class="tiles">
-      <div class="tile"><div class="k">Checks this month</div><div class="v" id="dashChecks">—</div></div>
+      <div class="tile"><div class="k">Checks</div><div class="v" id="dashChecks">—</div></div>
       <div class="tile mark ok"><div class="k">Ready</div><div class="v" id="dashReady">—</div><div class="s" id="dashReadyN"></div></div>
       <div class="tile mark hold"><div class="k">Hold</div><div class="v" id="dashHold">—</div><div class="s" id="dashHoldN"></div></div>
       <div class="tile"><div class="k">Most common failed check</div><div class="v text" id="dashTop">—</div><div class="s" id="dashTopN"></div></div>
     </div>
+    <p class="note" id="dashRange"></p>
     <p class="note" id="dashNote"></p>
   </section>
 

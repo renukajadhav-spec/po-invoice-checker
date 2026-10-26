@@ -941,6 +941,7 @@ const showTime = iso => new Date(iso).toLocaleString("en-IN", { dateStyle: "medi
 
 function refreshHistory() {
   loadHistory();
+  fillDashDates(); // so "This month" stays right if the page was left open overnight
   loadDashboard();
 }
 
@@ -1061,13 +1062,43 @@ async function downloadHistory() {
 
 $("historyCsv").addEventListener("click", downloadHistory);
 
-// ---------- Dashboard: this month's checks ----------
+// ---------- Dashboard: checks in the chosen period ----------
+const ymd = d => d.toLocaleDateString("en-CA"); // local date as YYYY-MM-DD
+const localDay = s => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+
+// From / To dates for each Period choice (Custom keeps whatever dates are typed in)
+function dashRange(period) {
+  const now = new Date(), y = now.getFullYear(), m = now.getMonth(), d = now.getDate();
+  const day = (yy, mm, dd) => ymd(new Date(yy, mm, dd));
+  switch (period) {
+    case "month":     return { from: day(y, m, 1), to: ymd(now) };
+    case "lastMonth": return { from: day(y, m - 1, 1), to: day(y, m, 0) };
+    case "7":         return { from: day(y, m, d - 6), to: ymd(now) };
+    case "30":        return { from: day(y, m, d - 29), to: ymd(now) };
+    case "year":      return { from: day(y, 0, 1), to: ymd(now) };
+    case "all":       return { from: "", to: "" };
+  }
+}
+
+function fillDashDates() {
+  const r = dashRange($("dashPeriod").value);
+  if (r) { $("dashFrom").value = r.from; $("dashTo").value = r.to; }
+}
+
+let dashAsk = 0;
 async function loadDashboard() {
-  const now = new Date();
-  const start = new Date(now.getFullYear(), now.getMonth(), 1);
-  $("dashMonth").textContent = now.toLocaleString("en-IN", { month: "long", year: "numeric" });
-  const { data, error } = await db.from("check_history").select("verdict, failed_checks").gte("checked_at", start.toISOString());
+  const ask = ++dashAsk;
+  const from = $("dashFrom").value, to = $("dashTo").value;
+  if (from && to && from > to) { $("dashNote").textContent = "From date must be on or before the To date."; return; }
+
+  // The whole To day counts: up to midnight at the start of the next day
+  let q = db.from("check_history").select("verdict, failed_checks");
+  if (from) q = q.gte("checked_at", localDay(from).toISOString());
+  if (to) { const end = localDay(to); end.setDate(end.getDate() + 1); q = q.lt("checked_at", end.toISOString()); }
+  const { data, error } = await q;
+  if (ask !== dashAsk) return;
   if (error) { $("dashNote").textContent = "Could not load the dashboard: " + error.message; return; }
+  $("dashRange").textContent = from || to ? `Showing ${from ? showDate(from) : "the start"} – ${to ? showDate(to) : "today"}` : "Showing all time";
 
   const n = data.length;
   const hold = data.filter(h => h.verdict === "Hold").length;
@@ -1083,8 +1114,12 @@ async function loadDashboard() {
   $("dashHoldN").textContent = n ? `${hold} of ${n}` : "";
   $("dashTop").textContent = top || "—";
   $("dashTopN").textContent = top ? `failed ${topN} time${topN > 1 ? "s" : ""}` : "";
-  $("dashNote").textContent = n ? "" : "No checks yet this month.";
+  $("dashNote").textContent = n ? "" : "No checks in this period.";
 }
+
+$("dashPeriod").addEventListener("change", () => { fillDashDates(); loadDashboard(); });
+["dashFrom", "dashTo"].forEach(id => $(id).addEventListener("change", () => { $("dashPeriod").value = "custom"; loadDashboard(); }));
+fillDashDates();
 
 // ---------- Print / Save as PDF ----------
 $("printBtn").addEventListener("click", () => window.print());

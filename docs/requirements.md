@@ -12,7 +12,7 @@ The app flags and holds. The manager approves.
 2. Chooses a PO file and an invoice file: CSV, PDF or image (JPG/PNG).
 3. Reviews what the app read and corrects anything wrong. Empty required boxes show in red.
 4. Clicks **Check** and sees a summary plus a table: Check / Status / PO says / Invoice says. **Print / Save as PDF** gives one clean page of the result, with who checked it and when.
-5. Sees the **Dashboard** for this month: number of checks, % Ready, % Hold, most common failed check.
+5. Sees the **Dashboard** for the chosen period (default this month; also last month, last 7 / 30 days, this year, all time or custom From–To dates): number of checks, % Ready, % Hold, most common failed check.
 6. Sees the **History**: every check by any signed-in user, newest first (latest 50). Can search by PO or invoice number, tick **Hold only**, click a row to see each check's reasons, and **Download CSV** to open it in Excel.
 
 ## History
