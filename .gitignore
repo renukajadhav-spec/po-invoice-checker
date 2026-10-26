@@ -1,0 +1,11 @@
+# Secret keys: stay on this laptop, never pushed
+.env
+
+# Python leftovers
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# Editor settings
+.vscode/

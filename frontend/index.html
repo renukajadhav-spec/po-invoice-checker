@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PO–Invoice Checker</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+<main>
+  <h1 class="hero"><span class="w">PO–Invoice</span> <span class="w glow">Checker</span></h1>
+  <p class="sub">Upload a PO and its invoice, and see ✓ / ✗ for each check.</p>
+
+  <section class="card" id="login">
+    <h2>Sign in</h2>
+    <form id="loginForm">
+      <label for="email">Email</label>
+      <input class="edit" type="email" id="email" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input class="edit" type="password" id="password" autocomplete="current-password" required>
+      <button type="submit" class="primary" id="signInBtn">Sign in</button>
+    </form>
+    <div class="error" id="loginError"></div>
+    <p class="note">Only people added by the app owner can sign in.</p>
+  </section>
+
+  <div id="app" hidden>
+  <div class="userbar">
+    <span>Signed in as <b id="userEmail"></b></span>
+    <button type="button" class="small" id="signOutBtn">Sign out</button>
+  </div>
+
+  <section class="card">
+    <h2>1. Choose the files</h2>
+    <div class="grid">
+      <div>
+        <label class="drop" id="poDrop">
+          <span class="drop-icon">📄</span>
+          <span class="drop-title">PO file</span>
+          <span class="drop-hint">CSV, PDF or image · click or drop here</span>
+          <span class="drop-name" id="poName"></span>
+          <input type="file" class="sr-only" id="poFile" accept=".csv,.pdf,.jpg,.jpeg,.png">
+        </label>
+        <div class="status" id="poStatus"></div>
+      </div>
+      <div>
+        <label class="drop" id="invDrop">
+          <span class="drop-icon">🧾</span>
+          <span class="drop-title">Invoice file</span>
+          <span class="drop-hint">CSV, PDF or image · click or drop here</span>
+          <span class="drop-name" id="invName"></span>
+          <input type="file" class="sr-only" id="invFile" accept=".csv,.pdf,.jpg,.jpeg,.png">
+        </label>
+        <div class="status" id="invStatus"></div>
+      </div>
+    </div>
+
+    <div class="error" id="error"></div>
+  </section>
+
+  <section class="card" id="review">
+    <h2>2. Review what was read</h2>
+    <p class="note" style="margin-top:-6px">Correct anything the app read wrongly. Boxes in red are empty and need filling in.</p>
+    <div class="side" id="review-po"></div>
+    <div class="side" id="review-inv"></div>
+  </section>
+
+  <section class="card">
+    <h2>3. Check</h2>
+    <button type="button" class="primary" id="checkBtn">Check</button>
+  </section>
+
+  <section class="card" id="results">
+    <h2>4. Results</h2>
+    <div class="verdict">
+      <div class="score" id="score">
+        <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="track" cx="60" cy="60" r="52"/><circle class="bar" id="scoreBar" cx="60" cy="60" r="52"/></svg>
+        <div class="score-num"><b id="scoreNum">0</b><span id="scoreOf">/ 6</span></div>
+      </div>
+      <div class="summary" id="summary"></div>
+    </div>
+    <div class="facts" id="facts"></div>
+    <div class="tablewrap">
+      <table>
+        <thead><tr><th>Check</th><th>Status</th><th>PO says</th><th>Invoice says</th></tr></thead>
+        <tbody id="resultRows"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <details>
+      <summary>The rules the app uses (GST rates)</summary>
+      <div id="rules"></div>
+    </details>
+  </section>
+  </div>
+
+  <footer>The app flags and holds. The manager approves.</footer>
+</main>
+
+<script src="app.js"></script>
+</body>
+</html>
