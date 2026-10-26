@@ -12,6 +12,13 @@ The app flags and holds. The manager approves.
 2. Chooses a PO file and an invoice file: CSV, PDF or image (JPG/PNG).
 3. Reviews what the app read and corrects anything wrong. Empty required boxes show in red.
 4. Clicks **Check** and sees a summary plus a table: Check / Status / PO says / Invoice says.
+5. Sees the **History**: every check by any signed-in user, newest first (latest 50).
+
+## History
+- Each click of **Check** saves one row in the Supabase table `check_history` (set up with `docs/check_history.sql`).
+- Saved: date and time, PO no., invoice no., invoice date, vendor name, checks passed / total, verdict, failed check names, who checked.
+- Not saved: the files or the item lines.
+- Every signed-in user can see all rows. Rows can be added but not changed or deleted from the app.
 
 ## Fields read
 - PO: `po_no, po_date, vendor_name, vendor_gstin, buyer_name, buyer_gstin, item, hsn, qty, rate, gst_rate`

@@ -17,3 +17,7 @@ All test data is fake. The sample files are in [`samples/`](../samples/).
 | 11 | Item not on PO | Invoice has an extra item | Items ✗ | | |
 | 12 | Different PO number | Invoice for another PO | Items ✗ | | |
 | 13 | Empty required box | Leave vendor name blank | Red box, check does not run | | |
+| 14 | History saved | Run test 3 | "✓ Saved to history"; new row in step 5 shows 6/6 Ready, PO, invoice, vendor, your email | | |
+| 15 | History of a Hold | Run test 4 | New row shows 5/6 Hold, Failed checks: Items | | |
+| 16 | History seen by all | Sign in as a second added user | Sees the first user's rows with their email under Checked by | | |
+| 17 | Failed check not saved | Test 13 (check does not run) | No new history row | | |
