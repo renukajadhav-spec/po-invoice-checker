@@ -840,17 +840,27 @@ for (const side of ["po", "inv"]) {
   });
 }
 
-$("checkBtn").addEventListener("click", () => {
+$("checkBtn").addEventListener("click", async () => {
   setError("");
   if (!loadedSides.po || !loadedSides.inv) return setError("Choose both a PO file and an invoice file first.");
+  const btn = $("checkBtn");
+  btn.disabled = true; // a double click can't check or save twice
   try {
     const po = collectSide("po"), inv = collectSide("inv");
     const checked = runChecks(po, inv);
+    // The same PO + invoice can only be checked once; Re-check in History is the way to check it again
+    if (!recheckOf) {
+      const earlier = await findEarlierCheck(checked.poNo, checked.header.invoice_no);
+      if (earlier) throw new Error(`${checked.poNo} + ${checked.header.invoice_no} was already checked on ${showTime(earlier.checked_at)} by ${shortName(earlier.checked_by_email)} (${resultText(earlier)}). To check it again, use ↻ Re-check in History.`);
+    }
     showResults(checked);
     $("printedBy").textContent = `Checked by ${$("userEmail").textContent} on ${showTime(new Date())}`;
-    saveHistory(checked, recordsToDoc(po, "po"), recordsToDoc(inv, "inv"));
+    await saveHistory(checked, recordsToDoc(po, "po"), recordsToDoc(inv, "inv"));
   } catch (err) {
     setError(err.message);
+    $("error").scrollIntoView({ behavior: "smooth", block: "center" });
+  } finally {
+    btn.disabled = false;
   }
 });
 
@@ -950,7 +960,18 @@ async function saveHistory({ results, header, invDate, poNo }, poDoc, invDoc) {
   if (!error) refreshHistory();
 }
 
-const showTime = iso => new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+// The newest earlier check of this PO no. + invoice no. (capital/small letters ignored), or null
+async function findEarlierCheck(poNo, invoiceNo) {
+  const exact = s => String(s).trim().replace(/[\\%_]/g, "\\$&"); // % and _ taken literally, not as wildcards
+  const { data, error } = await db.from("check_history")
+    .select("checked_at, checked_by_email, passed, total, verdict")
+    .ilike("po_no", exact(poNo)).ilike("invoice_no", exact(invoiceNo))
+    .order("checked_at", { ascending: false }).limit(1);
+  if (error) throw new Error("Could not check History for an earlier check of this PO and invoice: " + error.message);
+  return data[0] || null;
+}
+
+const showTime = iso =>new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
 function refreshHistory() {
   loadHistory();

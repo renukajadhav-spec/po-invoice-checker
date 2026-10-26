@@ -44,6 +44,7 @@ The app flags and holds. The manager approves.
 
 - Names match even if dots, commas or extra spaces differ ("Pvt. Ltd." = "Pvt Ltd").
 - A difference of up to ₹1 is allowed for rounding.
+- The same PO no. + invoice no. can only be checked once (capital/small letters ignored). Checking it again shows an error with when, by whom and the result; use **↻ Re-check** in History to check it again.
 - All 7 pass → **Ready for manager approval**. Any fail → **Hold, follow up with vendor**.
 
 ## Rules the app uses

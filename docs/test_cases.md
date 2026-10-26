@@ -47,3 +47,7 @@ All test data is fake. The sample files are in [`samples/`](../samples/).
 | 41 | Hold row | Look at a Hold row's Approval column | "Fix and re-check first", no buttons | | |
 | 42 | Excel approval | Download Excel after tests 37–40 | Approval, Approved by, Approved on, Approval note filled | | |
 | 43 | History fits the screen | Laptop, normal browser size | All 6 History columns visible, no sideways scroll | | |
+| 44 | Same pair twice | Check `test-set/1-matched` PO + invoice, then the same files again | 2nd time: red error "…already checked on … by … (7/7 Ready)…"; no new History row | | |
+| 45 | Same pair, other letter case | In step 2 change the invoice no. to small letters, Check | Still the error | | |
+| 46 | Re-check allowed | ↻ Re-check that row → Check | Works; saved as "Re-check of …" | | |
+| 47 | Double click | Double-click Check on a new pair | Only one History row | | |
