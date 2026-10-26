@@ -272,7 +272,7 @@
   .detail-line.fail b { color: var(--no); }
   .detail-line .why { font-size: 12px; color: var(--muted); margin-left: 18px; }
   .detail-line.fail .why { color: var(--no); }
-  .detail-foot { margin: 12px 0 4px; }
+  .recheck-btn { white-space: nowrap; color: var(--accent); border-color: rgba(95, 212, 196, .45); }
   td .sub { font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 4px; white-space: normal; }
 
   /* Re-check banner in step 2 */

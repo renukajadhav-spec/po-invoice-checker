@@ -998,30 +998,34 @@ function endRecheck() {
 
 $("recheckCancel").addEventListener("click", endRecheck);
 
-// Each check with ✓ / ✗ and its reasons, shown under a clicked history row, plus the Re-check button
+// The Re-check column: a button when the PO and invoice were saved, otherwise a dash
+function recheckCell(h) {
+  const td = document.createElement("td");
+  if (!(h.po_data && h.invoice_data)) {
+    td.className = "empty";
+    td.textContent = "—";
+    td.title = "Older check: the PO and invoice were not saved, so it can't be re-checked";
+    return td;
+  }
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "small recheck-btn";
+  btn.textContent = "↻ Re-check";
+  btn.title = "Load this PO and invoice into step 2 to correct or upload the corrected file";
+  btn.addEventListener("click", e => { e.stopPropagation(); startRecheck(h); });
+  td.appendChild(btn);
+  return td;
+}
+
+// Each check with ✓ / ✗ and its reasons, shown under a clicked history row
 function detailRow(h) {
   const tr = document.createElement("tr");
   tr.className = "detail";
   const td = tr.insertCell();
-  td.colSpan = 7;
-  const foot = document.createElement("div");
-  foot.className = "detail-foot";
-  if (h.po_data && h.invoice_data) {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "small";
-    btn.textContent = "↻ Re-check this PO and invoice";
-    btn.addEventListener("click", () => startRecheck(h));
-    foot.appendChild(btn);
-  } else {
-    foot.className += " empty";
-    foot.textContent = "This older check can't be re-checked: the PO and invoice were not saved.";
-  }
+  td.colSpan = 8;
   if (!h.details) {
-    const d = document.createElement("div");
-    d.className = "empty";
-    d.textContent = "Details were not saved for this older check.";
-    td.append(d, foot);
+    td.className = "empty";
+    td.textContent = "Details were not saved for this older check.";
     return tr;
   }
   h.details.forEach(d => {
@@ -1034,7 +1038,6 @@ function detailRow(h) {
     d.issues.forEach(t => { const w = document.createElement("div"); w.className = "why"; w.textContent = t; line.appendChild(w); });
     td.appendChild(line);
   });
-  td.appendChild(foot);
   return tr;
 }
 
@@ -1046,7 +1049,7 @@ async function loadHistory() {
   const message = text => {
     body.replaceChildren();
     const td = body.insertRow().insertCell();
-    td.colSpan = 7;
+    td.colSpan = 8;
     td.className = "empty";
     td.textContent = text;
   };
@@ -1080,7 +1083,7 @@ async function loadHistory() {
       tr.classList.toggle("open");
     };
     tr.addEventListener("click", toggle);
-    tr.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+    tr.addEventListener("keydown", e => { if (e.target === tr && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggle(); } });
     const when = cell([showTime(h.checked_at)]);
     if (h.rechecked_from) subLine(when, origTime.has(h.rechecked_from) ? `Re-check of ${showTime(origTime.get(h.rechecked_from))}` : "Re-check");
     tr.appendChild(when);
@@ -1096,6 +1099,7 @@ async function loadHistory() {
     tr.appendChild(st);
     tr.appendChild(cell(h.failed_checks.length ? h.failed_checks : ["—"]));
     tr.appendChild(cell([h.checked_by_email]));
+    tr.appendChild(recheckCell(h));
   });
 }
 

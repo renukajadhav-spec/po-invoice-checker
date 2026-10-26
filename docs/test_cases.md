@@ -35,8 +35,8 @@ All test data is fake. The sample files are in [`samples/`](../samples/).
 | 29 | Dashboard, last month | Period: Last month (no checks then) | 0 checks, "No checks in this period." | | |
 | 30 | Dashboard, custom | Change From or To | Period switches to Custom; whole To day is counted | | |
 | 31 | Dashboard, wrong range | From after To | "From date must be on or before the To date", tiles unchanged | | |
-| 32 | Re-check, fix a box | Hold row → open → Re-check → fix the wrong box → Check | Step 2 filled + orange banner; new row "Re-check of <date>"; old row "Re-checked → 7/7 Ready" | | |
+| 32 | Re-check, fix a box | Hold row → ↻ Re-check (last column) → fix the wrong box → Check | Step 2 filled + orange banner; new row "Re-check of <date>"; old row "Re-checked → 7/7 Ready" | | |
 | 33 | Re-check, corrected file | Re-check → upload a corrected invoice file in step 1 → Check | Only the invoice side is replaced; new row still linked to the old one | | |
 | 34 | Cancel re-check | Re-check → Cancel re-check → Check | Banner gone; new row is a normal check (no "Re-check of") | | |
-| 35 | Older row | Open a row saved before Re-check existed | "This older check can't be re-checked…", no button | | |
+| 35 | Older row | Row saved before Re-check existed | "—" in the Re-check column, no button | | |
 | 36 | CSV with re-checks | Download CSV after test 32 | ID and Re-check of ID columns link the two rows | | |
