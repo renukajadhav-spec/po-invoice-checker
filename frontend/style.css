@@ -94,6 +94,7 @@
   #app > :nth-child(5) { animation-delay: .40s; }
   #app > :nth-child(6) { animation-delay: .50s; }
   #app > :nth-child(7) { animation-delay: .60s; }
+  #app > :nth-child(8) { animation-delay: .70s; }
   #app > #review, #app > #results { animation-delay: 0s; }
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(26px); }
@@ -254,8 +255,34 @@
   /* History */
   .cardhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
   .cardhead h2 { margin: 0; }
+  .cardhead .buttons { display: flex; gap: 8px; }
+  .cardfoot { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 14px; }
+  .historytools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-bottom: 8px; }
+  .historytools .edit { max-width: 320px; }
+  label.tick { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 14px; cursor: pointer; }
+  label.tick input { accent-color: var(--accent); width: 16px; height: 16px; }
   #historyRows tr:hover { background: rgba(95, 212, 196, .05); }
   #historyRows td:first-child { white-space: nowrap; }
+  #historyRows tr.clickable { cursor: pointer; }
+  #historyRows tr.clickable:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  #historyRows tr.open, #historyRows tr.detail { background: rgba(95, 212, 196, .06); }
+  tr.detail td { padding-top: 4px; }
+  .detail-line { margin: 6px 0; }
+  .detail-line b { color: var(--ok); }
+  .detail-line.fail b { color: var(--no); }
+  .detail-line .why { font-size: 12px; color: var(--muted); margin-left: 18px; }
+  .detail-line.fail .why { color: var(--no); }
+
+  /* Dashboard tiles: numbers in text colour, a coloured bar marks Ready / Hold */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+  .tile { padding: 14px 16px; border-radius: 14px; background: rgba(4, 26, 24, .55); border: 1px solid var(--line); }
+  .tile.mark { border-left: 4px solid var(--ok); }
+  .tile.mark.hold { border-left-color: var(--warn); }
+  .tile .k { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .tile .v { font-size: 30px; font-weight: 800; line-height: 1.25; margin-top: 4px; }
+  .tile .v.text { font-size: 19px; padding-top: 6px; }
+  .tile .s { font-size: 12px; color: var(--muted); }
+  #dashNote:empty { display: none; }
   details summary { cursor: pointer; font-weight: 600; }
   details table { margin-top: 10px; }
   details pre {
@@ -283,6 +310,30 @@
     background: rgba(4, 26, 24, .5); border: 1px solid var(--line); border-radius: 99px;
   }
   .userbar b { color: var(--text); }
+
+  /* Print / Save as PDF: only the result, on a plain white page */
+  .printonly { display: none; }
+  @media print {
+    @page { margin: 14mm; }
+    :root {
+      --text: #000; --muted: #444; --line: #bbb; --accent: #1d7f74;
+      --ok: #1d7f74; --ok-soft: #e3f4f1; --no: #c62828; --no-soft: #fdecea; --warn: #a35400; --warn-soft: #fdf0e1;
+    }
+    html, body { background: #fff; color: #000; }
+    body::before, body::after { display: none; }
+    *, *::before, *::after { animation: none !important; transition: none !important; box-shadow: none !important; text-shadow: none !important; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    main { padding: 0; max-width: none; }
+    .hero, .sub, .userbar, .noprint, #app > .card:not(#results) { display: none !important; }
+    #results { display: block !important; background: #fff; border: 0; padding: 0; backdrop-filter: none; -webkit-backdrop-filter: none; }
+    #results h2::after { content: " — PO–Invoice Checker"; font-weight: 400; color: var(--muted); }
+    .score .bar { filter: none; }
+    .facts span { background: #fff; }
+    .tablewrap { overflow: visible; }
+    tr { break-inside: avoid; }
+    .printonly { display: block; font-size: 13px; color: var(--muted); margin-top: 12px; }
+    footer { margin-top: 12px; text-align: left; }
+  }
 
   /* Comfort setting: no movement when the computer asks for reduced motion */
   @media (prefers-reduced-motion: reduce) {

@@ -845,6 +845,7 @@ $("checkBtn").addEventListener("click", () => {
   try {
     const checked = runChecks(collectSide("po"), collectSide("inv"));
     showResults(checked);
+    $("printedBy").textContent = `Checked by ${$("userEmail").textContent} on ${showTime(new Date())}`;
     saveHistory(checked);
   } catch (err) {
     setError(err.message);
@@ -884,7 +885,7 @@ function showSignedIn(user) {
   $("app").hidden = !user;
   $("userEmail").textContent = user ? user.email : "";
   // Run after the sign-in event finishes: Supabase can stall if asked for data inside its own event
-  if (user) setTimeout(loadHistory);
+  if (user) setTimeout(refreshHistory);
 }
 
 (async function startLogin() {
@@ -929,14 +930,58 @@ async function saveHistory({ results, header, invDate, poNo }) {
     passed: results.length - failed.length,
     total: results.length,
     verdict: failed.length ? "Hold" : "Ready for manager approval",
-    failed_checks: failed
+    failed_checks: failed,
+    details: results.map(r => ({ name: r.name, issues: r.issues }))
   });
   note.textContent = error ? "Could not save to history: " + error.message : "✓ Saved to history (step 5).";
-  if (!error) loadHistory();
+  if (!error) refreshHistory();
 }
 
-// The latest 50 checks by anyone, newest first
+const showTime = iso => new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
+
+function refreshHistory() {
+  loadHistory();
+  loadDashboard();
+}
+
+// History rows matching the search box and the Hold only tick, newest first
+function historyQuery(limit) {
+  let q = db.from("check_history").select("*").order("checked_at", { ascending: false }).limit(limit);
+  // Keep only characters a PO or invoice number can have, so the search text can't break the query
+  const term = $("historySearch").value.replace(/[^A-Za-z0-9\/\-.]/g, "");
+  if (term) q = q.or(`po_no.ilike.*${term}*,invoice_no.ilike.*${term}*`);
+  if ($("holdOnly").checked) q = q.eq("verdict", "Hold");
+  return q;
+}
+
+// Each check with ✓ / ✗ and its reasons, shown under a clicked history row
+function detailRow(h) {
+  const tr = document.createElement("tr");
+  tr.className = "detail";
+  const td = tr.insertCell();
+  td.colSpan = 7;
+  if (!h.details) {
+    td.className = "empty";
+    td.textContent = "Details were not saved for this older check.";
+    return tr;
+  }
+  h.details.forEach(d => {
+    const ok = d.issues.length === 0;
+    const line = document.createElement("div");
+    line.className = "detail-line" + (ok ? "" : " fail");
+    const b = document.createElement("b");
+    b.textContent = (ok ? "✓ " : "✗ ") + d.name;
+    line.appendChild(b);
+    d.issues.forEach(t => { const w = document.createElement("div"); w.className = "why"; w.textContent = t; line.appendChild(w); });
+    td.appendChild(line);
+  });
+  return tr;
+}
+
+// The latest 50 checks that match the search, newest first. A newer search replaces an older one still loading.
+let historyAsk = 0;
 async function loadHistory() {
+  const ask = ++historyAsk;
   const body = $("historyRows");
   const message = text => {
     body.replaceChildren();
@@ -945,15 +990,28 @@ async function loadHistory() {
     td.className = "empty";
     td.textContent = text;
   };
-  const { data, error } = await db.from("check_history").select("*").order("checked_at", { ascending: false }).limit(50);
+  const { data, error } = await historyQuery(50);
+  if (ask !== historyAsk) return;
   if (error) return message("Could not load the history: " + error.message);
-  if (!data.length) return message("No checks saved yet.");
+  const filtered = $("historySearch").value.trim() || $("holdOnly").checked;
+  if (!data.length) return message(filtered ? "No checks match your search." : "No checks saved yet.");
 
   body.replaceChildren();
   data.forEach(h => {
     const tr = body.insertRow();
     const hold = h.verdict === "Hold";
-    tr.appendChild(cell([new Date(h.checked_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })]));
+    tr.className = "clickable";
+    tr.tabIndex = 0;
+    tr.title = "Click to see the reasons";
+    const toggle = () => {
+      const next = tr.nextElementSibling;
+      if (next?.classList.contains("detail")) next.remove();
+      else tr.after(detailRow(h));
+      tr.classList.toggle("open");
+    };
+    tr.addEventListener("click", toggle);
+    tr.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
+    tr.appendChild(cell([showTime(h.checked_at)]));
     tr.appendChild(cell([h.po_no]));
     tr.appendChild(cell([h.invoice_no, showDate(h.invoice_date)]));
     tr.appendChild(cell([h.vendor_name]));
@@ -968,4 +1026,65 @@ async function loadHistory() {
   });
 }
 
-$("historyRefresh").addEventListener("click", loadHistory);
+let searchTimer;
+$("historySearch").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadHistory, 300); });
+$("holdOnly").addEventListener("change", loadHistory);
+$("historyRefresh").addEventListener("click", refreshHistory);
+
+// ---------- Download history as CSV (opens in Excel) ----------
+// Quotes around cells with commas, quotes or line breaks; a ' in front of = + - @ so Excel never runs a cell as a formula
+function csvCell(v) {
+  let s = String(v ?? "");
+  if (/^[=+\-@]/.test(s)) s = "'" + s;
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+async function downloadHistory() {
+  const note = $("historyNote");
+  const { data, error } = await historyQuery(1000);
+  if (error) { note.textContent = "Could not download the history: " + error.message; return; }
+  const head = ["Checked on", "PO no.", "Invoice no.", "Invoice date", "Vendor", "Passed", "Total", "Verdict", "Failed checks", "Reasons", "Checked by"];
+  const rows = data.map(h => [
+    showTime(h.checked_at), h.po_no, h.invoice_no, showDate(h.invoice_date), h.vendor_name, h.passed, h.total, h.verdict,
+    h.failed_checks.join("; "),
+    (h.details || []).flatMap(d => d.issues.map(t => `${d.name}: ${t}`)).join("; "),
+    h.checked_by_email
+  ]);
+  // "\uFEFF" tells Excel the file is UTF-8, so ₹ and names show correctly
+  const text = "\uFEFF" + [head, ...rows].map(r => r.map(csvCell).join(",")).join("\r\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type: "text/csv;charset=utf-8" }));
+  a.download = `check-history-${new Date().toLocaleDateString("en-CA")}.csv`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+$("historyCsv").addEventListener("click", downloadHistory);
+
+// ---------- Dashboard: this month's checks ----------
+async function loadDashboard() {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  $("dashMonth").textContent = now.toLocaleString("en-IN", { month: "long", year: "numeric" });
+  const { data, error } = await db.from("check_history").select("verdict, failed_checks").gte("checked_at", start.toISOString());
+  if (error) { $("dashNote").textContent = "Could not load the dashboard: " + error.message; return; }
+
+  const n = data.length;
+  const hold = data.filter(h => h.verdict === "Hold").length;
+  const counts = {};
+  data.forEach(h => h.failed_checks.forEach(c => counts[c] = (counts[c] || 0) + 1));
+  const [top, topN] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0] || [];
+  const readyPct = n ? Math.round((n - hold) / n * 100) : 0;
+
+  $("dashChecks").textContent = n;
+  $("dashReady").textContent = n ? readyPct + "%" : "—";
+  $("dashReadyN").textContent = n ? `${n - hold} of ${n}` : "";
+  $("dashHold").textContent = n ? (100 - readyPct) + "%" : "—";
+  $("dashHoldN").textContent = n ? `${hold} of ${n}` : "";
+  $("dashTop").textContent = top || "—";
+  $("dashTopN").textContent = top ? `failed ${topN} time${topN > 1 ? "s" : ""}` : "";
+  $("dashNote").textContent = n ? "" : "No checks yet this month.";
+}
+
+// ---------- Print / Save as PDF ----------
+$("printBtn").addEventListener("click", () => window.print());

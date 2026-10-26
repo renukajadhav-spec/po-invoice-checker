@@ -87,15 +87,40 @@
         <tbody id="resultRows"></tbody>
       </table>
     </div>
-    <p class="note" id="historyNote"></p>
+    <p class="printonly" id="printedBy"></p>
+    <div class="cardfoot noprint">
+      <button type="button" class="small" id="printBtn">Print / Save as PDF</button>
+      <span class="note" id="historyNote"></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="cardhead">
+      <h2>Dashboard</h2>
+      <span class="note" id="dashMonth"></span>
+    </div>
+    <div class="tiles">
+      <div class="tile"><div class="k">Checks this month</div><div class="v" id="dashChecks">—</div></div>
+      <div class="tile mark ok"><div class="k">Ready</div><div class="v" id="dashReady">—</div><div class="s" id="dashReadyN"></div></div>
+      <div class="tile mark hold"><div class="k">Hold</div><div class="v" id="dashHold">—</div><div class="s" id="dashHoldN"></div></div>
+      <div class="tile"><div class="k">Most common failed check</div><div class="v text" id="dashTop">—</div><div class="s" id="dashTopN"></div></div>
+    </div>
+    <p class="note" id="dashNote"></p>
   </section>
 
   <section class="card">
     <div class="cardhead">
       <h2>5. History</h2>
-      <button type="button" class="small" id="historyRefresh">Refresh</button>
+      <div class="buttons">
+        <button type="button" class="small" id="historyCsv">Download CSV</button>
+        <button type="button" class="small" id="historyRefresh">Refresh</button>
+      </div>
     </div>
-    <p class="note" style="margin-top:-6px">Every check by anyone, newest first (latest 50).</p>
+    <p class="note" style="margin-top:-6px">Every check by anyone, newest first (latest 50). Click a row to see the reasons.</p>
+    <div class="historytools">
+      <input class="edit" type="search" id="historySearch" placeholder="Search PO or invoice no." aria-label="Search PO or invoice number">
+      <label class="tick"><input type="checkbox" id="holdOnly"> Hold only</label>
+    </div>
     <div class="tablewrap">
       <table>
         <thead><tr><th>Checked on</th><th>PO no.</th><th>Invoice</th><th>Vendor</th><th>Result</th><th>Failed checks</th><th>Checked by</th></tr></thead>

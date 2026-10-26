@@ -6,7 +6,7 @@ All test data is fake. The sample files are in [`samples/`](../samples/).
 |---|---|---|---|---|---|
 | 1 | Sign-in, right password | Added user | App screen opens | | |
 | 2 | Sign-in, wrong password | Added user, wrong password | Error shown, app stays hidden | | |
-| 3 | Everything matches | `po-1001.pdf` + `invoice-501.pdf` | 6/6 ✓, Ready for manager approval | | |
+| 3 | Everything matches | `po-1001.pdf` + `invoice-501.pdf` | 7/7 ✓, Ready for manager approval | | |
 | 4 | Over-billing (image) | `po-1002.pdf` + `invoice-m-207.png` | Items ✗: qty 13 vs PO 12; Hold | | |
 | 5 | Vendor details differ | Change invoice vendor GSTIN in review step | Vendor details ✗ | | |
 | 6 | Buyer details differ | Change invoice buyer name in review step | Buyer details ✗ | | |
@@ -17,7 +17,17 @@ All test data is fake. The sample files are in [`samples/`](../samples/).
 | 11 | Item not on PO | Invoice has an extra item | Items ✗ | | |
 | 12 | Different PO number | Invoice for another PO | Items ✗ | | |
 | 13 | Empty required box | Leave vendor name blank | Red box, check does not run | | |
-| 14 | History saved | Run test 3 | "✓ Saved to history"; new row in step 5 shows 6/6 Ready, PO, invoice, vendor, your email | | |
-| 15 | History of a Hold | Run test 4 | New row shows 5/6 Hold, Failed checks: Items | | |
+| 14 | History saved | Run test 3 | "✓ Saved to history"; new row in step 5 shows 7/7 Ready, PO, invoice, vendor, your email | | |
+| 15 | History of a Hold | Run test 4 | New row shows 6/7 Hold, Failed checks: Items | | |
 | 16 | History seen by all | Sign in as a second added user | Sees the first user's rows with their email under Checked by | | |
 | 17 | Failed check not saved | Test 13 (check does not run) | No new history row | | |
+| 18 | Invoice before PO | Invoice date 1 day before the PO date | Dates ✗, Hold | | |
+| 19 | Invoice same day as PO | Invoice date = PO date | Dates ✓ | | |
+| 20 | PO date empty | Clear PO date in review step | Red box, check does not run | | |
+| 21 | Row details | Click a new history row | All 7 checks with ✓ / ✗ and reasons; click again closes | | |
+| 22 | Older row details | Click a row saved before details existed | "Details were not saved for this older check." | | |
+| 23 | Search | Type part of a PO number | Only matching rows; clear the box → all rows back | | |
+| 24 | Hold only | Tick Hold only | Only Hold rows | | |
+| 25 | Download CSV | Click Download CSV, open in Excel | Columns correct, names and ₹ readable, same rows as the search shows | | |
+| 26 | Print / Save as PDF | After a check, click Print / Save as PDF | One white page: result only, checked by + date, footer | | |
+| 27 | Dashboard | Compare with this month's rows in Supabase | Checks, Ready %, Hold %, most common failed check all match | | |
