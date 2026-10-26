@@ -28,7 +28,10 @@
   <div id="app" hidden>
   <div class="userbar">
     <span>Signed in as <b id="userEmail"></b></span>
-    <button type="button" class="small" id="signOutBtn">Sign out</button>
+    <div class="buttons">
+      <button type="button" class="small" id="guideShow" hidden>Show guide</button>
+      <button type="button" class="small" id="signOutBtn">Sign out</button>
+    </div>
   </div>
 
   <section class="card">
@@ -153,6 +156,13 @@
       <div id="rules"></div>
     </details>
   </section>
+
+  <!-- Next step guide: fixed at the bottom of the screen, changes as the user goes -->
+  <div class="guide" id="guide" role="status" aria-live="polite">
+    <div class="guide-text"><b id="guideStep"></b> <span id="guideText"></span></div>
+    <button type="button" class="small" id="guideGo"></button>
+    <button type="button" class="guide-x" id="guideClose" aria-label="Hide the guide" title="Hide the guide">×</button>
+  </div>
   </div>
 
   <footer>The app flags and holds. The manager approves.</footer>

@@ -51,3 +51,12 @@ All test data is fake. The sample files are in [`samples/`](../samples/).
 | 45 | Same pair, other letter case | In step 2 change the invoice no. to small letters, Check | Still the error | | |
 | 46 | Re-check allowed | ↻ Re-check that row → Check | Works; saved as "Re-check of …" | | |
 | 47 | Double click | Double-click Check on a new pair | Only one History row | | |
+| 48 | Guide, start | Sign in | Bottom bar: "Step 1 of 4 · Choose the PO file and the invoice file." | | |
+| 49 | Guide, one file | Choose only the PO | "Now choose the invoice file." (while reading: "Reading the file… please wait.") | | |
+| 50 | Guide, both files | Choose the invoice too | "Step 2 of 4 · Scroll down and check what was read…"; **Go to step 2 ↓** scrolls to step 2 | | |
+| 51 | Guide, error | Clear a red box, click Check | Red-edged bar "Fix the problem…"; **Show the problem** scrolls to the error | | |
+| 52 | Guide, result | Check a Ready and a Hold pair | "Step 4 of 4 · Ready (7/7)… approve" / "Hold (6/7)… Re-check"; **Go to History ↓** scrolls to History | | |
+| 53 | Guide, edit after Check | Change a box in step 2 after a result | Bar goes back to step 2 wording | | |
+| 54 | Guide, re-check | ↻ Re-check a row | "Re-check · Correct the boxes…" | | |
+| 55 | Hide / show guide | Click × on the bar, then **Show guide** in the top bar | Bar hides, then comes back | | |
+| 56 | Guide not printed | Print / Save as PDF | No guide bar on the page | | |
