@@ -843,10 +843,11 @@ $("checkBtn").addEventListener("click", () => {
   setError("");
   if (!loadedSides.po || !loadedSides.inv) return setError("Choose both a PO file and an invoice file first.");
   try {
-    const checked = runChecks(collectSide("po"), collectSide("inv"));
+    const po = collectSide("po"), inv = collectSide("inv");
+    const checked = runChecks(po, inv);
     showResults(checked);
     $("printedBy").textContent = `Checked by ${$("userEmail").textContent} on ${showTime(new Date())}`;
-    saveHistory(checked);
+    saveHistory(checked, recordsToDoc(po, "po"), recordsToDoc(inv, "inv"));
   } catch (err) {
     setError(err.message);
   }
@@ -886,6 +887,7 @@ function showSignedIn(user) {
   $("userEmail").textContent = user ? user.email : "";
   // Run after the sign-in event finishes: Supabase can stall if asked for data inside its own event
   if (user) setTimeout(refreshHistory);
+  else endRecheck();
 }
 
 (async function startLogin() {
@@ -916,8 +918,12 @@ function showSignedIn(user) {
 })();
 
 // ---------- History (Supabase table check_history, see docs/check_history.sql) ----------
-// One row per click of Check: which PO and invoice, the result, and who checked it
-async function saveHistory({ results, header, invDate, poNo }) {
+// The history row being re-checked (set by its Re-check button), or null for a normal check
+let recheckOf = null;
+
+// One row per click of Check: which PO and invoice, the result, who checked it,
+// and the PO and invoice as reviewed in step 2 so the check can be re-checked later
+async function saveHistory({ results, header, invDate, poNo }, poDoc, invDoc) {
   const note = $("historyNote");
   note.textContent = "Saving to history…";
   const failed = results.filter(r => r.issues.length).map(r => r.name);
@@ -931,7 +937,10 @@ async function saveHistory({ results, header, invDate, poNo }) {
     total: results.length,
     verdict: failed.length ? "Hold" : "Ready for manager approval",
     failed_checks: failed,
-    details: results.map(r => ({ name: r.name, issues: r.issues }))
+    details: results.map(r => ({ name: r.name, issues: r.issues })),
+    po_data: poDoc,
+    invoice_data: invDoc,
+    rechecked_from: recheckOf?.id ?? null
   });
   note.textContent = error ? "Could not save to history: " + error.message : "✓ Saved to history (step 5).";
   if (!error) refreshHistory();
@@ -955,15 +964,64 @@ function historyQuery(limit) {
   return q;
 }
 
-// Each check with ✓ / ✗ and its reasons, shown under a clicked history row
+const resultText = h => `${h.passed}/${h.total} ${h.verdict === "Hold" ? "Hold" : "Ready"}`;
+
+// A small grey line under a cell's main text
+function subLine(td, text) {
+  const d = document.createElement("div");
+  d.className = "sub";
+  d.textContent = text;
+  td.appendChild(d);
+}
+
+// ---------- Re-check: load a saved PO and invoice back into step 2 ----------
+function startRecheck(h) {
+  recheckOf = h;
+  setError("");
+  renderReview("po", { ...h.po_data, how: "saved check", name: h.po_no });
+  renderReview("inv", { ...h.invoice_data, how: "saved check", name: h.invoice_no });
+  for (const side of ["po", "inv"]) {
+    $(side + "File").value = "";
+    $(side + "Name").textContent = "";
+    $(side + "Status").textContent = "";
+    $(side + "Drop").classList.remove("done");
+  }
+  $("recheckText").textContent = `Re-checking the check from ${showTime(h.checked_at)}. Correct the boxes, or upload the corrected file in step 1, then click Check.`;
+  $("recheckBanner").hidden = false;
+  $("review").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function endRecheck() {
+  recheckOf = null;
+  $("recheckBanner").hidden = true;
+}
+
+$("recheckCancel").addEventListener("click", endRecheck);
+
+// Each check with ✓ / ✗ and its reasons, shown under a clicked history row, plus the Re-check button
 function detailRow(h) {
   const tr = document.createElement("tr");
   tr.className = "detail";
   const td = tr.insertCell();
   td.colSpan = 7;
+  const foot = document.createElement("div");
+  foot.className = "detail-foot";
+  if (h.po_data && h.invoice_data) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "small";
+    btn.textContent = "↻ Re-check this PO and invoice";
+    btn.addEventListener("click", () => startRecheck(h));
+    foot.appendChild(btn);
+  } else {
+    foot.className += " empty";
+    foot.textContent = "This older check can't be re-checked: the PO and invoice were not saved.";
+  }
   if (!h.details) {
-    td.className = "empty";
-    td.textContent = "Details were not saved for this older check.";
+    const d = document.createElement("div");
+    d.className = "empty";
+    d.textContent = "Details were not saved for this older check.";
+    td.append(d, foot);
     return tr;
   }
   h.details.forEach(d => {
@@ -976,6 +1034,7 @@ function detailRow(h) {
     d.issues.forEach(t => { const w = document.createElement("div"); w.className = "why"; w.textContent = t; line.appendChild(w); });
     td.appendChild(line);
   });
+  td.appendChild(foot);
   return tr;
 }
 
@@ -997,6 +1056,16 @@ async function loadHistory() {
   const filtered = $("historySearch").value.trim() || $("holdOnly").checked;
   if (!data.length) return message(filtered ? "No checks match your search." : "No checks saved yet.");
 
+  // Links between re-checks: the date of each original, and the latest re-check of each shown row
+  const fromIds = data.map(h => h.rechecked_from).filter(Boolean);
+  const [orig, later] = await Promise.all([
+    fromIds.length ? db.from("check_history").select("id, checked_at").in("id", fromIds) : { data: [] },
+    db.from("check_history").select("rechecked_from, passed, total, verdict").in("rechecked_from", data.map(h => h.id)).order("checked_at")
+  ]);
+  if (ask !== historyAsk) return;
+  const origTime = new Map((orig.data || []).map(o => [o.id, o.checked_at]));
+  const latest = new Map((later.data || []).map(r => [r.rechecked_from, r])); // oldest first, so the newest wins
+
   body.replaceChildren();
   data.forEach(h => {
     const tr = body.insertRow();
@@ -1012,15 +1081,18 @@ async function loadHistory() {
     };
     tr.addEventListener("click", toggle);
     tr.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); } });
-    tr.appendChild(cell([showTime(h.checked_at)]));
+    const when = cell([showTime(h.checked_at)]);
+    if (h.rechecked_from) subLine(when, origTime.has(h.rechecked_from) ? `Re-check of ${showTime(origTime.get(h.rechecked_from))}` : "Re-check");
+    tr.appendChild(when);
     tr.appendChild(cell([h.po_no]));
     tr.appendChild(cell([h.invoice_no, showDate(h.invoice_date)]));
     tr.appendChild(cell([h.vendor_name]));
     const st = cell([], "pass " + (hold ? "hold" : "ok"));
     const badge = document.createElement("span");
     badge.className = "badge";
-    badge.textContent = `${h.passed}/${h.total} ${hold ? "Hold" : "Ready"}`;
+    badge.textContent = resultText(h);
     st.appendChild(badge);
+    if (latest.has(h.id)) subLine(st, `Re-checked → ${resultText(latest.get(h.id))}`);
     tr.appendChild(st);
     tr.appendChild(cell(h.failed_checks.length ? h.failed_checks : ["—"]));
     tr.appendChild(cell([h.checked_by_email]));
@@ -1044,12 +1116,12 @@ async function downloadHistory() {
   const note = $("historyNote");
   const { data, error } = await historyQuery(1000);
   if (error) { note.textContent = "Could not download the history: " + error.message; return; }
-  const head = ["Checked on", "PO no.", "Invoice no.", "Invoice date", "Vendor", "Passed", "Total", "Verdict", "Failed checks", "Reasons", "Checked by"];
+  const head = ["ID", "Checked on", "PO no.", "Invoice no.", "Invoice date", "Vendor", "Passed", "Total", "Verdict", "Failed checks", "Reasons", "Checked by", "Re-check of ID"];
   const rows = data.map(h => [
-    showTime(h.checked_at), h.po_no, h.invoice_no, showDate(h.invoice_date), h.vendor_name, h.passed, h.total, h.verdict,
+    h.id, showTime(h.checked_at), h.po_no, h.invoice_no, showDate(h.invoice_date), h.vendor_name, h.passed, h.total, h.verdict,
     h.failed_checks.join("; "),
     (h.details || []).flatMap(d => d.issues.map(t => `${d.name}: ${t}`)).join("; "),
-    h.checked_by_email
+    h.checked_by_email, h.rechecked_from
   ]);
   // "\uFEFF" tells Excel the file is UTF-8, so ₹ and names show correctly
   const text = "\uFEFF" + [head, ...rows].map(r => r.map(csvCell).join(",")).join("\r\n");

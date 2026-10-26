@@ -14,7 +14,10 @@ create table public.check_history (
   total            int  not null,
   verdict          text not null,
   failed_checks    text[] not null default '{}',
-  details          jsonb  -- each check's name and reasons: [{"name": "Items", "issues": ["..."]}]
+  details          jsonb,  -- each check's name and reasons: [{"name": "Items", "issues": ["..."]}]
+  po_data          jsonb,  -- the PO as reviewed in step 2: { header, items }
+  invoice_data     jsonb,  -- the invoice as reviewed in step 2: { header, items }
+  rechecked_from   bigint references public.check_history (id)  -- the row this check re-checks
 );
 
 -- Open the table to signed-in users only (new tables are not exposed automatically).

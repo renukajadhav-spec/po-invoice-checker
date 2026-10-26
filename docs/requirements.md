@@ -14,12 +14,14 @@ The app flags and holds. The manager approves.
 4. Clicks **Check** and sees a summary plus a table: Check / Status / PO says / Invoice says. **Print / Save as PDF** gives one clean page of the result, with who checked it and when.
 5. Sees the **Dashboard** for the chosen period (default this month; also last month, last 7 / 30 days, this year, all time or custom From–To dates): number of checks, % Ready, % Hold, most common failed check.
 6. Sees the **History**: every check by any signed-in user, newest first (latest 50). Can search by PO or invoice number, tick **Hold only**, click a row to see each check's reasons, and **Download CSV** to open it in Excel.
+7. **Re-checks** a corrected PO or invoice: in an opened history row, **Re-check this PO and invoice** fills step 2 with the saved PO and invoice. The user corrects the boxes or uploads the corrected file, then clicks Check. The new row says "Re-check of <date>", and the old row shows "Re-checked → <result>".
 
 ## History
 - Each click of **Check** saves one row in the Supabase table `check_history` (set up with `docs/check_history.sql`).
 - Saved: date and time, PO no., invoice no., invoice date, vendor name, checks passed / total, verdict, failed check names, each check's reasons (`details`), who checked.
-- The `details` column is added with `docs/check_history_add_details.sql`. Older rows have no details.
-- Not saved: the files or the item lines.
+- Also saved: the PO and invoice as reviewed in step 2 (header details and item lines, `po_data` / `invoice_data`), and which row a re-check is for (`rechecked_from`).
+- Columns added later: `details` with `docs/check_history_add_details.sql`; `po_data`, `invoice_data`, `rechecked_from` with `docs/check_history_add_recheck.sql`. Older rows don't have them, so they can't show reasons or be re-checked.
+- Not saved: the uploaded files.
 - Every signed-in user can see all rows. Rows can be added but not changed or deleted from the app.
 
 ## Fields read
@@ -48,6 +50,6 @@ The app flags and holds. The manager approves.
 
 ## Not in this version
 - Python backend doing the checks (the files in `backend/` are outlines only)
-- Saving POs, invoices, vendors or GST rates in Supabase
+- Saving POs, invoices, vendors or GST rates as their own records in Supabase (History keeps only a copy of each checked PO and invoice)
 - Email connection and reminders
 - Several invoices against one PO
