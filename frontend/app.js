@@ -663,7 +663,7 @@ function runChecks(po, inv) {
     });
   }
 
-  return { results, header: I, invDate };
+  return { results, header: I, invDate, poNo: P.po_no };
 }
 
 // ---------- Showing the results ----------
@@ -830,7 +830,9 @@ $("checkBtn").addEventListener("click", () => {
   setError("");
   if (!loadedSides.po || !loadedSides.inv) return setError("Choose both a PO file and an invoice file first.");
   try {
-    showResults(runChecks(collectSide("po"), collectSide("inv")));
+    const checked = runChecks(collectSide("po"), collectSide("inv"));
+    showResults(checked);
+    saveHistory(checked);
   } catch (err) {
     setError(err.message);
   }
@@ -853,8 +855,9 @@ $("checkBtn").addEventListener("click", () => {
 
 // ---------- Login (Supabase Auth) ----------
 // The publishable key is meant to be public; Supabase checks the email and password on its own server.
-const SUPABASE_URL = "https://mbormqyxqiwmbceufmmn.supabase.co";
-const SUPABASE_KEY = "sb_publishable_nEgw9AKlQAXCazrC6UtdfQ_yumbBymq";
+const SUPABASE_URL = "https://zdfnvemxhwklduqkniod.supabase.co";
+const SUPABASE_KEY = "sb_publishable_6sXqMklXanBF4n_yUgc3Xg_4ZHwpF8k";
+const db = window.supabase?.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 function showLoginError(msg) {
   const e = $("loginError");
@@ -867,15 +870,17 @@ function showSignedIn(user) {
   $("login").hidden = !!user;
   $("app").hidden = !user;
   $("userEmail").textContent = user ? user.email : "";
+  // Run after the sign-in event finishes: Supabase can stall if asked for data inside its own event
+  if (user) setTimeout(loadHistory);
 }
 
 (async function startLogin() {
-  if (!window.supabase) {
+  if (!db) {
     showLoginError("Could not load the sign-in service. Check your internet connection and refresh the page.");
     $("signInBtn").disabled = true;
     return;
   }
-  const auth = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY).auth;
+  const auth = db.auth;
 
   const { data } = await auth.getSession();
   showSignedIn(data.session?.user);
@@ -895,3 +900,59 @@ function showSignedIn(user) {
 
   $("signOutBtn").addEventListener("click", () => auth.signOut());
 })();
+
+// ---------- History (Supabase table check_history, see docs/check_history.sql) ----------
+// One row per click of Check: which PO and invoice, the result, and who checked it
+async function saveHistory({ results, header, invDate, poNo }) {
+  const note = $("historyNote");
+  note.textContent = "Saving to history…";
+  const failed = results.filter(r => r.issues.length).map(r => r.name);
+  const { error } = await db.from("check_history").insert({
+    checked_by_email: $("userEmail").textContent,
+    po_no: poNo,
+    invoice_no: header.invoice_no,
+    invoice_date: invDate,
+    vendor_name: header.vendor_name,
+    passed: results.length - failed.length,
+    total: results.length,
+    verdict: failed.length ? "Hold" : "Ready for manager approval",
+    failed_checks: failed
+  });
+  note.textContent = error ? "Could not save to history: " + error.message : "✓ Saved to history (step 5).";
+  if (!error) loadHistory();
+}
+
+// The latest 50 checks by anyone, newest first
+async function loadHistory() {
+  const body = $("historyRows");
+  const message = text => {
+    body.replaceChildren();
+    const td = body.insertRow().insertCell();
+    td.colSpan = 7;
+    td.className = "empty";
+    td.textContent = text;
+  };
+  const { data, error } = await db.from("check_history").select("*").order("checked_at", { ascending: false }).limit(50);
+  if (error) return message("Could not load the history: " + error.message);
+  if (!data.length) return message("No checks saved yet.");
+
+  body.replaceChildren();
+  data.forEach(h => {
+    const tr = body.insertRow();
+    const hold = h.verdict === "Hold";
+    tr.appendChild(cell([new Date(h.checked_at).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" })]));
+    tr.appendChild(cell([h.po_no]));
+    tr.appendChild(cell([h.invoice_no, showDate(h.invoice_date)]));
+    tr.appendChild(cell([h.vendor_name]));
+    const st = cell([], "pass " + (hold ? "hold" : "ok"));
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    badge.textContent = `${h.passed}/${h.total} ${hold ? "Hold" : "Ready"}`;
+    st.appendChild(badge);
+    tr.appendChild(st);
+    tr.appendChild(cell(h.failed_checks.length ? h.failed_checks : ["—"]));
+    tr.appendChild(cell([h.checked_by_email]));
+  });
+}
+
+$("historyRefresh").addEventListener("click", loadHistory);

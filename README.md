@@ -14,7 +14,7 @@ Live link: https://renukajadhav-spec.github.io/po-invoice-checker/
 | `frontend/` | The app: `index.html` (page layout), `style.css` (looks), `app.js` (logic, reading and the 6 checks) |
 | `backend/` | Python outlines for a future server: `main.py`, `read_documents.py`, `checks.py`, `database.py`. Not used yet |
 | `data/gst_rates.csv` | GST rate slabs with valid-from / valid-to dates |
-| `docs/` | `requirements.md` (what the app must do), `test_cases.md` (what to test) |
+| `docs/` | `requirements.md` (what the app must do), `test_cases.md` (what to test), `check_history.sql` (creates the history table) |
 | `tests/` | `test_checks.py`, Python tests for `checks.py` (skipped until it is real) |
 | `samples/` | Fake PO and invoice files for testing |
 | `requirements.txt` | Python libraries the backend needs |
@@ -26,6 +26,7 @@ Live link: https://renukajadhav-spec.github.io/po-invoice-checker/
 2. Sign in, then choose a PO file and an invoice file, each as **CSV, PDF or image (JPG/PNG)**.
 3. **Review what was read** and correct anything wrong; red boxes are empty and need filling in.
 4. Click **Check** and see the summary plus a table: **Check / Status / PO says / Invoice says**.
+5. Every check is saved to **History** (step 5), which all signed-in users can see.
 
 The 6 checks and the CSV column headings are in [docs/requirements.md](docs/requirements.md).
 Fake test files: `samples/po-1001.pdf` + `samples/invoice-501.pdf` (expect 6/6 ✓) and `samples/po-1002.pdf` + `samples/invoice-m-207.png` (expect ✗ over-billing, qty 13 vs 12).
@@ -40,10 +41,16 @@ Fake test files: `samples/po-1001.pdf` + `samples/invoice-501.pdf` (expect 6/6 �
 Clear, typed documents work best. Files are never uploaded anywhere; everything runs in the browser.
 
 ## Login
-Sign-in is handled by **Supabase Auth** (project `training`).
+Sign-in and check history use the Supabase project **`po-invoice-checker`**.
 - **Add a user:** Supabase → Authentication → Users → **Add user → Create new user**, enter email + password, tick **Auto Confirm User**.
 - **Public sign-up is off**, so only users added this way can sign in.
 - **Who opened it:** Supabase → Authentication → Users shows each person's **Last sign in**.
+
+## History table
+Check history is kept in the Supabase table `check_history`.
+- **Set up once:** Supabase → SQL Editor → New query → paste [docs/check_history.sql](docs/check_history.sql) → **Run**.
+- **See it:** Supabase → Table Editor → `check_history`, or step 5 in the app.
+- Row Level Security lets signed-in users read all rows and add their own; nobody can edit or delete rows from the app.
 
 ## Keys
 The page uses only the Supabase **publishable** key, which is meant to be public. Any secret key goes in `.env`, which `.gitignore` keeps out of GitHub.

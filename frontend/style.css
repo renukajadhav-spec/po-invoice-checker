@@ -93,6 +93,7 @@
   #app > :nth-child(4) { animation-delay: .30s; }
   #app > :nth-child(5) { animation-delay: .40s; }
   #app > :nth-child(6) { animation-delay: .50s; }
+  #app > :nth-child(7) { animation-delay: .60s; }
   #app > #review, #app > #results { animation-delay: 0s; }
   @keyframes fadeUp {
     from { opacity: 0; transform: translateY(26px); }
@@ -247,8 +248,14 @@
   .pass .badge { display: inline-block; padding: 3px 10px; border-radius: 99px; }
   .pass.ok .badge { color: var(--ok); background: var(--ok-soft); box-shadow: 0 0 14px rgba(95, 212, 196, .3); }
   .pass.no .badge { color: var(--no); background: var(--no-soft); }
+  .pass.hold .badge { color: var(--warn); background: var(--warn-soft); }
   .row-in .pass.ok .badge { animation: pop .5s both; }
   .row-in .pass.no .badge { animation: shake .5s both; }
+  /* History */
+  .cardhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 14px; }
+  .cardhead h2 { margin: 0; }
+  #historyRows tr:hover { background: rgba(95, 212, 196, .05); }
+  #historyRows td:first-child { white-space: nowrap; }
   details summary { cursor: pointer; font-weight: 600; }
   details table { margin-top: 10px; }
   details pre {
