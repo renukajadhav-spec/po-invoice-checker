@@ -1,0 +1,897 @@
+// ---------- Lookup data (all fake) ----------
+
+// GST Rates table with Valid From / Valid To (simplified: main slabs only)
+const GST_RATES = [
+  { from: "2017-07-01", to: "2025-09-21", rates: [0, 5, 12, 18, 28] },
+  { from: "2025-09-22", to: null,         rates: [0, 5, 18, 40] }
+];
+const ALL_RATES = [0, 5, 12, 18, 28, 40];
+
+// The fields on each side: header details (once per document) and item columns (once per line)
+const FIELDS = {
+  po:  { label: "PO",
+         header: ["po_no", "po_date", "vendor_name", "vendor_gstin", "buyer_name", "buyer_gstin"],
+         items:  ["item", "hsn", "qty", "rate", "gst_rate"] },
+  inv: { label: "Invoice",
+         header: ["invoice_no", "invoice_date", "po_no", "vendor_name", "vendor_gstin", "buyer_name", "buyer_gstin"],
+         items:  ["item", "hsn", "qty", "rate", "amount", "gst_rate", "cgst", "sgst", "igst"] }
+};
+const PO_COLS  = [...FIELDS.po.header,  ...FIELDS.po.items];
+const INV_COLS = [...FIELDS.inv.header, ...FIELDS.inv.items];
+const COLS = { po: PO_COLS, inv: INV_COLS };
+
+const NICE = {
+  po_no: "PO no.", po_date: "PO date", invoice_no: "Invoice no.", invoice_date: "Invoice date",
+  vendor_name: "Vendor name", vendor_gstin: "Vendor GSTIN", buyer_name: "Buyer name", buyer_gstin: "Buyer GSTIN",
+  item: "Item", hsn: "HSN", qty: "Qty", rate: "Rate", amount: "Amount", gst_rate: "GST %",
+  cgst: "CGST", sgst: "SGST", igst: "IGST"
+};
+const OPTIONAL = ["po_date", "hsn", "cgst", "sgst", "igst"];
+const NUMBER_FIELDS = ["qty", "rate", "amount", "gst_rate", "cgst", "sgst", "igst"];
+
+// ---------- Small helpers ----------
+const $ = id => document.getElementById(id);
+const norm = s => String(s ?? "").trim().replace(/\s+/g, " ").toUpperCase();
+const money = n => "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
+const round2 = n => Math.round(n * 100) / 100;
+const TOLERANCE = 1; // ₹1 rounding difference allowed
+
+function num(s) {
+  const t = String(s ?? "").replace(/[₹,\s%]/g, "");
+  return t === "" ? NaN : Number(t);
+}
+
+const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
+
+// Accepts 2025-09-25, 25-09-2025, 25/09/2025, 25.09.2025, 25-Sep-2025, 25 Sep 2025, 25 September, 2025 or September 25, 2025. Returns "YYYY-MM-DD" or null.
+function parseDate(s) {
+  s = String(s ?? "").trim();
+  let y, m, d, x;
+  if ((x = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/))) [y, m, d] = [+x[1], +x[2], +x[3]];
+  else if ((x = s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{4})$/))) [d, m, y] = [+x[1], +x[2], +x[3]];
+  else if ((x = s.match(/^(\d{1,2})[-\s]([A-Za-z]{3})[A-Za-z]*[-\s,]+(\d{4})$/))) [d, m, y] = [+x[1], MONTHS.indexOf(x[2].toUpperCase()) + 1, +x[3]];
+  else if ((x = s.match(/^([A-Za-z]{3})[A-Za-z]*\.?\s+(\d{1,2}),?\s+(\d{4})$/))) [m, d, y] = [MONTHS.indexOf(x[1].toUpperCase()) + 1, +x[2], +x[3]];
+  else return null;
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return null;
+  return dt.toISOString().slice(0, 10);
+}
+
+function showDate(iso) {
+  const [y, m, d] = iso.split("-");
+  return `${+d} ${MONTHS[m - 1][0] + MONTHS[m - 1].slice(1).toLowerCase()} ${y}`;
+}
+
+
+// ---------- Reading CSV files ----------
+function parseCSV(text) {
+  text = text.replace(/^﻿/, "");
+  const rows = [];
+  let row = [], cell = "", quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (quoted) {
+      if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+      else if (c === '"') quoted = false;
+      else cell += c;
+    } else if (c === '"') quoted = true;
+    else if (c === ",") { row.push(cell); cell = ""; }
+    else if (c === "\n" || c === "\r") {
+      if (c === "\r" && text[i + 1] === "\n") i++;
+      row.push(cell); rows.push(row); row = []; cell = "";
+    } else cell += c;
+  }
+  row.push(cell); rows.push(row);
+  return rows.filter(r => r.some(v => v.trim() !== ""));
+}
+
+// CSV text → one record (all fields as text) per item row
+function toRecords(text, cols, label) {
+  const rows = parseCSV(text);
+  if (rows.length === 0) throw new Error(`The ${label} file is empty.`);
+  const head = rows[0].map(h => h.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, ""));
+  const missing = cols.filter(c => !head.includes(c));
+  if (missing.length) throw new Error(`The ${label} file is missing these columns: ${missing.join(", ")}. Start from the template.`);
+  if (rows.length < 2) throw new Error(`The ${label} file has headings but no item rows.`);
+  return rows.slice(1).map(r => {
+    const rec = {};
+    head.forEach((h, i) => rec[h] = (r[i] ?? "").trim());
+    return rec;
+  });
+}
+
+// Records → a document: header details from the first row, every row as an item line
+function recordsToDoc(records, side) {
+  const header = {}, f = FIELDS[side];
+  f.header.forEach(k => header[k] = records[0][k] ?? "");
+  const items = records.map(r => Object.fromEntries(f.items.map(k => [k, r[k] ?? ""])));
+  return { header, items };
+}
+
+// ---------- Reading PDFs and images ----------
+const LIBS = {
+  pdf:       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js",
+  pdfWorker: "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js",
+  ocr:       "https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js"
+};
+const scriptLoads = {};
+function loadScript(src) {
+  return scriptLoads[src] ||= new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = src;
+    s.onload = resolve;
+    s.onerror = () => { delete scriptLoads[src]; reject(new Error("Could not load the PDF/image reader. Check your internet connection and try again.")); };
+    document.head.appendChild(s);
+  });
+}
+
+// pdf.js gives separate pieces of text with positions; put pieces at the same height onto one line
+function groupLines(pieces) {
+  const rows = [];
+  for (const p of pieces) {
+    const row = rows.find(r => Math.abs(r.y - p.y) < 3);
+    if (row) row.pieces.push(p); else rows.push({ y: p.y, pieces: [p] });
+  }
+  return rows.sort((a, b) => b.y - a.y)
+             .map(r => r.pieces.sort((a, b) => a.x - b.x).map(p => p.s.trim()).join("  "));
+}
+
+// One OCR worker is started once and reused; psm is Tesseract's page layout mode
+let ocrWorker = null, ocrProgress = () => {};
+async function ocrToLines(image, psm, progress, part) {
+  await loadScript(LIBS.ocr);
+  ocrProgress = m => progress(m.status === "recognizing text"
+    ? `Reading the text${part}… ${Math.round(m.progress * 100)}%`
+    : `Getting the text reader ready (${m.status})…`);
+  ocrWorker ||= Tesseract.createWorker("eng", 1, { logger: m => ocrProgress(m) });
+  const worker = await ocrWorker;
+  await worker.setParameters({ tessedit_pageseg_mode: psm });
+  const { data } = await worker.recognize(image);
+  return data.text.split("\n");
+}
+
+// OCR can miss table rows, so if no item line is found, read again with a different page layout mode
+async function readByOcr(images, side, progress) {
+  let best = null;
+  for (const [psm, tryLabel] of [["3", ""], ["6", ", 2nd try"], ["4", ", 3rd try"]]) {
+    let lines = [];
+    for (let i = 0; i < images.length; i++) {
+      const page = images.length > 1 ? `page ${i + 1} of ${images.length}` : "";
+      const part = page || tryLabel ? ` (${[page, tryLabel.slice(2)].filter(Boolean).join(", ")})` : "";
+      lines = lines.concat(await ocrToLines(images[i], psm, progress, part));
+    }
+    const doc = parseDocument(lines, side);
+    if (!best) best = doc;
+    else if (doc.items.length > best.items.length) {
+      for (const k in doc.header) doc.header[k] ||= best.header[k];
+      best = doc;
+    }
+    if (best.items.length) break;
+  }
+  return best;
+}
+
+// A PDF with typed text gives its lines; a scanned PDF (only pictures of pages) gives page images for OCR
+async function readPdf(file) {
+  await loadScript(LIBS.pdf);
+  pdfjsLib.GlobalWorkerOptions.workerSrc = LIBS.pdfWorker;
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
+  let lines = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    const pieces = content.items.filter(i => i.str.trim()).map(i => ({ x: i.transform[4], y: i.transform[5], s: i.str }));
+    lines = lines.concat(groupLines(pieces));
+  }
+  if (lines.join("").replace(/\s/g, "").length >= 20) return { lines };
+
+  const images = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const viewport = page.getViewport({ scale: 2 });
+    const canvas = document.createElement("canvas");
+    canvas.width = viewport.width;
+    canvas.height = viewport.height;
+    await page.render({ canvasContext: canvas.getContext("2d"), viewport }).promise;
+    images.push(canvas);
+  }
+  return { images };
+}
+
+// ---------- Finding the fields in the text that was read ----------
+const GSTIN_RE = /\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]/g;
+const DATE_SRC = "(\\d{4}-\\d{1,2}-\\d{1,2}|\\d{1,2}[-\\/.]\\d{1,2}[-\\/.]\\d{4}|\\d{1,2}[-\\s][A-Za-z]{3,9}[-\\s,]+\\d{4}|[A-Za-z]{3,9}\\.?\\s+\\d{1,2},?\\s+\\d{4})";
+const BUYER_WORDS  = /bill(ed)?\s*to|buyer|customer|ship(ped)?\s*to|consignee|invoice\s*to/i;
+const VENDOR_WORDS = /supplier|vendor|seller|sold\s*by/i;
+const TOTAL_WORDS  = /total|round\s*off|in\s+words|balance|grand|cgst|sgst|igst|taxable/i;
+const TABLE_HEAD_WORDS = /description|particulars|\bitem\b|\bhsn\b|\bqty\b|quantity/i;
+// A heading on its own ("SUPPLIER", "BILL TO") or with the name after a colon ("Bill To: Sunrise …")
+const HEADING_RE = /^(supplier|vendor|seller|sold\s*by|bill(?:ed)?\s*to|ship(?:ped)?\s*to(?:\s*\/\s*bill(?:ed)?\s*to)?|buyer|customer|consignee)\s*(?:[:\-]\s*(.*))?$/i;
+const DOC_TITLES = /tax\s*invoice|purchase\s*order|^invoice$|original|duplicate|triplicate/i;
+
+// Two or more spaces are kept: they separate columns that sit side by side on one line
+const cleanLine = l => l.replace(/[|₹]/g, " ").replace(/\bRs\.?/gi, " ").replace(/\t/g, "  ").replace(/ {3,}/g, "  ").trim();
+const columns = l => l.split(/\s{2,}/).map(c => c.trim()).filter(Boolean);
+
+function valueAfter(lines, labelSrc, valueSrc) {
+  const re = new RegExp(labelSrc + "\\s*[:\\-]?\\s*" + valueSrc, "i");
+  for (const l of lines) { const m = l.match(re); if (m && /\d/.test(m[1])) return m[1].replace(/[.,;:]$/, ""); }
+  return "";
+}
+
+function findDate(lines, labels) {
+  for (const label of labels) {
+    const v = valueAfter(lines, label, DATE_SRC);
+    if (v && parseDate(v)) return parseDate(v);
+  }
+  return "";
+}
+
+function findGstins(lines) {
+  // Remember which section each GSTIN sits in (vendor or buyer); two sections side by side share one line
+  let roles = [];
+  const found = [];
+  for (const l of lines) {
+    const b = l.search(BUYER_WORDS), v = l.search(VENDOR_WORDS);
+    if (b >= 0 && v >= 0) roles = b < v ? ["buyer", "vendor"] : ["vendor", "buyer"];
+    else if (b >= 0) roles = ["buyer"];
+    else if (v >= 0) roles = ["vendor"];
+    const gs = l.toUpperCase().replace(/\s/g, "").match(GSTIN_RE) || [];
+    gs.forEach((g, i) => found.push({ g, role: roles.length > 1 ? roles[i] : roles[0] }));
+  }
+  const unique = [...new Map(found.map(f => [f.g, f])).values()];
+  let buyer = unique.find(f => f.role === "buyer");
+  const vendor = unique.find(f => f !== buyer && f.role === "vendor") || unique.find(f => f !== buyer);
+  if (!buyer) buyer = unique.find(f => f !== vendor);
+  return { vendor: vendor?.g || "", buyer: buyer?.g || "" };
+}
+
+// Names under headings like SUPPLIER / BILL TO (one heading, or two side by side on one line)
+function findNames(lines) {
+  const names = {};
+  const roleOf = h => /supplier|vendor|seller|sold/i.test(h) ? "vendor" : "buyer";
+  const take = (role, name) => {
+    // "Kaveri Paper Mart, Nashik, Maharashtra": the name ends where the address starts
+    name = (name || "").split(",")[0].replace(/\s+/g, " ").replace(/[:]$/, "").trim();
+    if (!names[role] && /[A-Za-z]{3}/.test(name) && !/gstin|\bpan\b|state|address|contact|plot|road|street/i.test(name)) names[role] = name;
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const whole = lines[i].replace(/\s+/g, " ").match(HEADING_RE);
+    const heads = whole ? [whole] : columns(lines[i]).map(c => c.match(HEADING_RE));
+    if (!heads.length || !heads.every(Boolean)) continue;
+    const next = columns(lines[i + 1] || "");
+    heads.forEach((h, c) => take(roleOf(h[1]), h[2] || (heads.length > 1 ? next[c] : next.join(" "))));
+  }
+  return names;
+}
+
+// The company that issued the document: its letterhead at the top, or "For <company>" above the signature
+function findIssuer(lines) {
+  for (const l of lines.slice(0, 5)) {
+    const s = l.replace(/\s+/g, " ");
+    if (/[A-Za-z]{3}/.test(s) && !DOC_TITLES.test(s) && !/gstin|\bpan\b|plot|road|street|@/i.test(s)) return columns(l)[0];
+  }
+  for (const l of [...lines].reverse()) {
+    const c = columns(l).find(c => /^for\s+[A-Za-z]/i.test(c));
+    if (c) return c.replace(/^for\s+/i, "");
+  }
+  return "";
+}
+
+// Every number on a line, with its position (GSTINs and dates are blanked out first)
+function numbersIn(line) {
+  const blank = m => " ".repeat(m.length);
+  const s = line.toUpperCase().replace(GSTIN_RE, blank).replace(new RegExp(DATE_SRC, "g"), blank);
+  const out = [];
+  const re = /(?<![A-Z\d\-\/.,])(\d{1,3}(?:,\d{2,3})+(?:\.\d+)?|\d+(?:\.\d+)?)(\s?%)?(?![A-Z\d])/g;
+  let m;
+  while ((m = re.exec(s))) {
+    out.push({ v: Number(m[1].replace(/,/g, "")), pct: !!m[2], idx: m.index, int: /^\d+$/.test(m[1]), digits: m[1].length });
+  }
+  return out;
+}
+
+const near = (a, b) => Math.abs(a - b) <= TOLERANCE;
+
+// An item line is any line where some qty × rate = amount, whatever the column order
+function parseItemLine(line, taxType) {
+  if (TOTAL_WORDS.test(line)) return null;
+  const nums = numbersIn(line);
+  const plain = nums.filter(n => !n.pct);
+  if (plain.length < 3) return null;
+
+  let best = null;
+  for (const q of plain) for (const r of plain) for (const a of plain) {
+    if (q === r || q === a || r === a || !(q.v > 0 && r.v > 0 && a.v > 0)) continue;
+    if (!near(q.v * r.v, a.v) || a.v < r.v) continue;
+    let score = (q.idx < r.idx && r.idx < a.idx ? 2 : 0) + (q.int ? 1 : 0) - (q.v === 1 && q === plain[0] ? 1 : 0);
+    if (!best || score > best.score || (score === best.score && a.v > best.a.v)) best = { q, r, a, score };
+  }
+  if (!best) return null;
+  const { q, r, a } = best;
+  const used = new Set([q, r, a]);
+
+  const hsn = plain.find(n => !used.has(n) && n.int && [4, 6, 8].includes(n.digits) && n.idx < q.idx);
+  if (hsn) used.add(hsn);
+
+  // GST %: a % that is a GST rate, or two equal halves (CGST 9% + SGST 9% → 18%)
+  const pcts = nums.filter(n => n.pct).map(n => n.v);
+  let gst = pcts.find(p => p > 0 && ALL_RATES.includes(p));
+  if (gst === undefined && pcts.length && ALL_RATES.includes(pcts[0] * 2)) gst = pcts[0] * 2;
+
+  // Tax amounts: first by value (amount × rate), else by position after the amount
+  const rest = plain.filter(n => !used.has(n) && n.idx > a.idx);
+  const tryRates = gst !== undefined ? [gst] : ALL_RATES.filter(x => x > 0);
+  let cgst = "", sgst = "", igst = "";
+  for (const g of tryRates) {
+    const halves = rest.filter(n => near(n.v, a.v * g / 200));
+    const full = rest.find(n => near(n.v, a.v * g / 100));
+    if (halves.length >= 2) { cgst = halves[0].v; sgst = halves[1].v; igst = 0; gst ??= g; break; }
+    if (full) { igst = full.v; cgst = 0; sgst = 0; gst ??= g; break; }
+  }
+  if (cgst === "" && igst === "") {
+    if (taxType === "cs" && rest.length >= 2) { cgst = rest[0].v; sgst = rest[1].v; igst = 0; }
+    else if (taxType === "i" && rest.length >= 1) { igst = rest[0].v; cgst = 0; sgst = 0; }
+  }
+
+  const firstIdx = Math.min(...[...used].map(n => n.idx));
+  const item = line.slice(0, firstIdx).replace(/^\s*\d+[.)]?\s+/, "").replace(/[^A-Za-z0-9)]+$/, "").trim();
+
+  return { item, hsn: hsn ? String(hsn.v) : "", qty: q.v, rate: r.v, amount: a.v, gst_rate: gst ?? "", cgst, sgst, igst };
+}
+
+// The last amount on a line such as "CGST @ 9% 4,590.00"
+function lastAmount(line) {
+  const plain = numbersIn(line).filter(n => !n.pct);
+  return plain.length ? plain[plain.length - 1].v : null;
+}
+
+function parseDocument(rawLines, side) {
+  const lines = rawLines.map(cleanLine).filter(Boolean);
+  const text = lines.join("\n");
+  const g = findGstins(lines);
+  const taxType = /\bCGST\b/i.test(text) ? "cs" : /\bIGST\b/i.test(text) ? "i" : "";
+
+  const names = findNames(lines);
+  const issuer = findIssuer(lines); // a PO is issued by the buyer, an invoice by the vendor
+
+  const header = {
+    po_no: valueAfter(lines, "(?:\\bP\\.?\\s?O\\.?|Purchase\\s+Order|Order)\\s*(?:No\\.?|Number|#)", "([A-Z0-9][A-Z0-9\\-\\/]*)")
+        || valueAfter(lines, "", "\\b(PO[-\\/][A-Z0-9\\-\\/]+)"),
+    vendor_gstin: g.vendor,
+    vendor_name: names.vendor || (side === "inv" ? issuer : ""),
+    buyer_gstin: g.buyer,
+    buyer_name: names.buyer || (side === "po" ? issuer : "")
+  };
+  if (side === "po") {
+    header.po_date = findDate(lines, ["P\\.?\\s?O\\.?\\s*Date", "Order\\s*Date", "\\bDated?"]);
+  } else {
+    header.invoice_no = valueAfter(lines, "(?:Invoice|Inv\\.?|Bill)\\s*(?:No\\.?|Number|#)", "([A-Z0-9][A-Z0-9\\-\\/]*)")
+                     || valueAfter(lines, "", "\\b(INV[-\\/][A-Z0-9\\-\\/]+)");
+    header.invoice_date = findDate(lines, ["Invoice\\s*Date", "Inv\\.?\\s*Date", "Bill\\s*Date", "(?<!P\\.?O\\.?\\s|Order\\s|Due\\s)\\bDated?"]);
+  }
+
+  // A long description can wrap onto lines above and below its numbers ("Ergonomic Office Chair (Mesh" / numbers / "Back)")
+  const rows = lines.map(l => parseItemLine(l, taxType));
+  const at = rows.map((it, i) => it ? i : -1).filter(i => i >= 0);
+  const isStop = l => TOTAL_WORDS.test(l) || TABLE_HEAD_WORDS.test(l);
+  const isText = l => /[A-Za-z]/.test(l) && !isStop(l);
+  const claimed = new Set();
+  const textLines = (from, to, step) => {
+    const out = [];
+    for (let j = from; j !== to && out.length < 3; j += step) {
+      if (isStop(lines[j])) break;
+      if (isText(lines[j]) && !claimed.has(j)) step > 0 ? out.push(j) : out.unshift(j);
+    }
+    return out;
+  };
+  const items = at.map((i, n) => {
+    const it = rows[i];
+    const prev = n ? at[n - 1] : -1, next = n < at.length - 1 ? at[n + 1] : lines.length;
+    let above = [], below = [];
+    if (!it.item) {
+      above = textLines(i - 1, prev, -1);
+      below = textLines(i + 1, next, 1).slice(0, Math.max(above.length, 1));
+    } else if (next === lines.length || rows[next].item) {
+      below = textLines(i + 1, next, 1);
+    }
+    [...above, ...below].forEach(j => claimed.add(j));
+    it.item = [...above.map(j => lines[j]), it.item, ...below.map(j => lines[j])].join(" ")
+      .replace(/^\s*\d+[.)]?\s+/, "").replace(/\s+/g, " ").trim();
+    return it;
+  });
+
+  // If the item lines had no tax amounts, use the CGST / SGST / IGST total lines, shared out by amount
+  if (side === "inv" && items.length && items.every(it => it.cgst === "" && it.igst === "")) {
+    const totals = { cgst: 0, sgst: 0, igst: 0 };
+    let any = false;
+    for (const l of lines) for (const k of ["cgst", "sgst", "igst"]) {
+      if (new RegExp("\\b" + k + "\\b", "i").test(l) && !/total/i.test(l.replace(new RegExp(k, "i"), ""))) {
+        const v = lastAmount(l);
+        if (v !== null) { totals[k] += v; any = true; }
+      }
+    }
+    if (any) {
+      const sum = items.reduce((s, it) => s + it.amount, 0);
+      for (const k in totals) {
+        let left = totals[k];
+        items.forEach((it, i) => {
+          it[k] = i === items.length - 1 ? round2(left) : round2(totals[k] * it.amount / sum);
+          left -= it[k];
+        });
+      }
+    }
+  }
+
+  const f = FIELDS[side];
+  return {
+    header: Object.fromEntries(f.header.map(k => [k, header[k] ?? ""])),
+    items: items.map(it => Object.fromEntries(f.items.map(k => [k, it[k] ?? ""]))),
+    text: rawLines.join("\n")
+  };
+}
+
+// ---------- Review step: editable tables ----------
+const loadedSides = { po: false, inv: false };
+
+function makeInput(field, value) {
+  const inp = document.createElement("input");
+  inp.className = "edit";
+  inp.dataset.f = field;
+  inp.value = value ?? "";
+  inp.setAttribute("aria-label", NICE[field]);
+  const mark = () => inp.classList.toggle("missing", !OPTIONAL.includes(field) && inp.value.trim() === "");
+  inp.addEventListener("input", mark);
+  mark();
+  return inp;
+}
+
+function addItemRow(tbody, side, item = {}) {
+  const tr = tbody.insertRow();
+  FIELDS[side].items.forEach(k => tr.insertCell().appendChild(makeInput(k, item[k])));
+  const del = document.createElement("button");
+  del.type = "button";
+  del.className = "small";
+  del.textContent = "✕";
+  del.title = "Delete this row";
+  del.addEventListener("click", () => tr.remove());
+  tr.insertCell().appendChild(del);
+}
+
+function renderReview(side, doc) {
+  const box = $("review-" + side), f = FIELDS[side];
+  box.replaceChildren();
+
+  const h = document.createElement("h3");
+  h.textContent = f.label;
+  const how = document.createElement("div");
+  how.className = "how";
+  how.textContent = `Read from ${doc.how}: ${doc.name}`;
+  box.append(h, how);
+
+  const fields = document.createElement("div");
+  fields.className = "fields";
+  f.header.forEach(k => {
+    const wrap = document.createElement("div");
+    const lab = document.createElement("label");
+    lab.textContent = NICE[k] + (OPTIONAL.includes(k) ? " (optional)" : "");
+    wrap.append(lab, makeInput(k, doc.header[k]));
+    fields.appendChild(wrap);
+  });
+  box.appendChild(fields);
+
+  const wrap = document.createElement("div");
+  wrap.className = "tablewrap";
+  const table = document.createElement("table");
+  table.className = "items";
+  const hr = table.createTHead().insertRow();
+  [...f.items.map(k => NICE[k]), ""].forEach(t => { const th = document.createElement("th"); th.textContent = t; hr.appendChild(th); });
+  const tbody = table.createTBody();
+  doc.items.forEach(it => addItemRow(tbody, side, it));
+  if (!doc.items.length) addItemRow(tbody, side);
+  wrap.appendChild(table);
+  box.appendChild(wrap);
+
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "small";
+  add.textContent = "+ Add item row";
+  add.style.marginTop = "6px";
+  add.addEventListener("click", () => addItemRow(tbody, side));
+  box.appendChild(add);
+
+  if (doc.text) {
+    const d = document.createElement("details");
+    d.style.marginTop = "10px";
+    const s = document.createElement("summary");
+    s.textContent = "Show the text that was read";
+    const pre = document.createElement("pre");
+    pre.textContent = doc.text;
+    d.append(s, pre);
+    box.appendChild(d);
+  }
+
+  loadedSides[side] = true;
+  $("review").style.display = "block";
+  $("results").style.display = "none";
+}
+
+// Review tables → checked records (one per item, header details repeated), ready for the checks
+function collectSide(side) {
+  const box = $("review-" + side), f = FIELDS[side];
+  const header = {};
+  box.querySelectorAll(".fields .edit").forEach(i => header[i.dataset.f] = i.value.trim());
+  const items = [...box.querySelectorAll("table.items tbody tr")].map(tr => {
+    const it = {};
+    tr.querySelectorAll(".edit").forEach(i => it[i.dataset.f] = i.value.trim());
+    return it;
+  }).filter(it => Object.values(it).some(v => v !== ""));
+
+  if (!items.length) throw new Error(`${f.label}: add at least one item row.`);
+  const empty = f.header.filter(k => !OPTIONAL.includes(k) && !header[k]).map(k => NICE[k]);
+  items.forEach((it, n) => f.items.forEach(k => { if (!OPTIONAL.includes(k) && !it[k]) empty.push(`${NICE[k]} (row ${n + 1})`); }));
+  if (empty.length) throw new Error(`${f.label}: fill in the red boxes first: ${empty.join(", ")}.`);
+
+  return items.map((it, n) => {
+    const rec = { ...header, ...it };
+    for (const k of NUMBER_FIELDS) {
+      if (!(k in rec)) continue;
+      rec[k] = ["cgst", "sgst", "igst"].includes(k) && rec[k] === "" ? 0 : num(rec[k]);
+      if (isNaN(rec[k])) throw new Error(`${f.label}, row ${n + 1}: "${NICE[k]}" is not a number.`);
+    }
+    rec.vendor_gstin = norm(rec.vendor_gstin);
+    rec.buyer_gstin = norm(rec.buyer_gstin);
+    return rec;
+  });
+}
+
+// ---------- The 6 checks ----------
+function runChecks(po, inv) {
+  const P = po[0], I = inv[0];
+  const invDate = parseDate(I.invoice_date);
+  if (!invDate) throw new Error(`The invoice date "${I.invoice_date}" is not a date I can read. Use a format like 25-09-2025.`);
+
+  const poByItem = {};
+  po.forEach(l => poByItem[norm(l.item)] = l);
+  // The first 2 digits of a GSTIN are the state code: same state → CGST + SGST, other state → IGST
+  const sameState = I.vendor_gstin.slice(0, 2) === I.buyer_gstin.slice(0, 2);
+  const results = [];
+
+  // Names compare without dots, commas and extra spaces ("Pvt. Ltd." = "Pvt Ltd")
+  const sameName = (a, b) => norm(a).replace(/[.,]/g, "").replace(/\s+/g, " ") === norm(b).replace(/[.,]/g, "").replace(/\s+/g, " ");
+
+  // 1. Vendor details: pass when the invoice vendor matches the PO vendor
+  {
+    const issues = [];
+    if (I.vendor_gstin !== P.vendor_gstin) issues.push("vendor GSTIN on the invoice is different from the PO");
+    if (!sameName(I.vendor_name, P.vendor_name)) issues.push("vendor name on the invoice is different from the PO");
+    results.push({
+      name: "Vendor details", issues,
+      okText: "Vendor name and GSTIN are the same on the PO and the invoice",
+      po: [P.vendor_name, P.vendor_gstin],
+      inv: [I.vendor_name, I.vendor_gstin]
+    });
+  }
+
+  // 2. Buyer details: pass when the invoice is billed to the same buyer as the PO
+  {
+    const issues = [];
+    if (!sameName(I.buyer_name, P.buyer_name)) issues.push("buyer name on the invoice is different from the PO");
+    if (I.buyer_gstin !== P.buyer_gstin) issues.push("buyer GSTIN on the invoice is different from the PO");
+    results.push({
+      name: "Buyer details", issues,
+      okText: "Buyer name and GSTIN are the same on the PO and the invoice",
+      po: [P.buyer_name, P.buyer_gstin],
+      inv: [I.buyer_name, I.buyer_gstin]
+    });
+  }
+
+  // 3. GST rate
+  {
+    const issues = [];
+    const slab = GST_RATES.find(s => invDate >= s.from && (!s.to || invDate <= s.to));
+    inv.forEach(l => {
+      if (!slab) issues.push(`no GST rates set up for ${showDate(invDate)}`);
+      else if (!slab.rates.includes(l.gst_rate)) issues.push(`${l.item}: ${l.gst_rate}% is not a valid GST rate on ${showDate(invDate)}`);
+      const p = poByItem[norm(l.item)];
+      if (p && p.gst_rate !== l.gst_rate) issues.push(`${l.item}: PO says ${p.gst_rate}%, invoice says ${l.gst_rate}%`);
+    });
+    results.push({
+      name: "GST rate", issues: [...new Set(issues)],
+      okText: `Same as the PO, and valid on ${showDate(invDate)}`,
+      po: po.map(l => `${l.item}: ${l.gst_rate}%`),
+      inv: inv.map(l => `${l.item}: ${l.gst_rate}%`).concat(`Invoice date: ${showDate(invDate)}`)
+    });
+  }
+
+  // 4. GST calculation
+  {
+    const issues = [];
+    const exp = { cgst: 0, sgst: 0, igst: 0 }, got = { cgst: 0, sgst: 0, igst: 0 };
+    inv.forEach(l => {
+      const tax = round2(l.amount * l.gst_rate / 100);
+      const e = sameState ? { cgst: tax / 2, sgst: tax / 2, igst: 0 } : { cgst: 0, sgst: 0, igst: tax };
+      for (const k in e) { exp[k] += e[k]; got[k] += l[k]; }
+      const wrong = Object.keys(e).filter(k => Math.abs(e[k] - l[k]) > TOLERANCE);
+      if (wrong.length) issues.push(`${l.item}: ` + wrong.map(k => `${k.toUpperCase()} should be ${money(e[k])}, invoice has ${money(l[k])}`).join("; "));
+    });
+    const fmt = t => sameState ? `CGST ${money(t.cgst)} + SGST ${money(t.sgst)}` + (t.igst ? ` + IGST ${money(t.igst)}` : "")
+                               : `IGST ${money(t.igst)}` + (t.cgst || t.sgst ? ` + CGST ${money(t.cgst)} + SGST ${money(t.sgst)}` : "");
+    results.push({
+      name: "GST calculation", issues,
+      okText: `Amount × rate matches the tax (${sameState ? "same state → CGST + SGST" : "other state → IGST"})`,
+      po: [`Expected: ${fmt(exp)}`, sameState ? "Same state → CGST + SGST" : "Other state → IGST"],
+      inv: [fmt(got)]
+    });
+  }
+
+  // 5. Qty × rate
+  {
+    const issues = [];
+    inv.forEach(l => {
+      const e = round2(l.qty * l.rate);
+      if (Math.abs(e - l.amount) > TOLERANCE) issues.push(`${l.item}: ${l.qty} × ${money(l.rate)} = ${money(e)}, invoice says ${money(l.amount)}`);
+    });
+    results.push({
+      name: "Qty × rate", issues,
+      okText: "Every line adds up",
+      po: inv.map(l => `${l.item}: ${l.qty} × ${money(l.rate)} = ${money(round2(l.qty * l.rate))}`),
+      inv: inv.map(l => `${l.item}: ${money(l.amount)}`)
+    });
+  }
+
+  // 6. Items: same PO, every item ordered, rate as agreed, qty not more than ordered
+  {
+    const issues = [];
+    if (norm(I.po_no) !== norm(P.po_no)) issues.push(`invoice is for ${I.po_no}, but this PO is ${P.po_no}`);
+    const qtyByItem = {};
+    inv.forEach(l => qtyByItem[norm(l.item)] = (qtyByItem[norm(l.item)] || 0) + l.qty);
+    inv.forEach(l => {
+      const p = poByItem[norm(l.item)];
+      if (!p) { issues.push(`${l.item} is not on the PO`); return; }
+      if (Math.abs(p.rate - l.rate) > 0.001) issues.push(`${l.item}: rate ${money(l.rate)}, PO rate ${money(p.rate)}`);
+    });
+    for (const k in qtyByItem) {
+      const p = poByItem[k];
+      if (p && qtyByItem[k] > p.qty) issues.push(`${p.item}: invoice qty ${qtyByItem[k]} is more than PO qty ${p.qty} (over-billing)`);
+    }
+    results.push({
+      name: "Items", issues: [...new Set(issues)],
+      okText: "Same PO, items, rates, and qty within the PO",
+      po: [P.po_no].concat(po.map(l => `${l.item}: ${l.qty} × ${money(l.rate)}`)),
+      inv: [`${I.po_no} (invoice ${I.invoice_no})`].concat(inv.map(l => `${l.item}: ${l.qty} × ${money(l.rate)}`))
+    });
+  }
+
+  return { results, header: I, invDate };
+}
+
+// ---------- Showing the results ----------
+function cell(lines, cls) {
+  const td = document.createElement("td");
+  if (cls) td.className = cls;
+  lines.forEach(t => { const d = document.createElement("div"); d.textContent = t; td.appendChild(d); });
+  return td;
+}
+
+function showResults({ results, header, invDate }) {
+  const passed = results.filter(r => r.issues.length === 0);
+  const failed = results.filter(r => r.issues.length > 0);
+  const s = $("summary");
+  s.className = "summary " + (failed.length ? "hold" : "ok");
+  s.textContent = failed.length
+    ? `${passed.length} of ${results.length} checks passed → Hold, follow up with vendor`
+    : `${results.length} of ${results.length} checks passed → Ready for manager approval`;
+  if (failed.length) {
+    const sm = document.createElement("small");
+    sm.textContent = "Failed: " + failed.map(r => r.name).join(", ");
+    s.appendChild(sm);
+  }
+
+  const f = $("facts");
+  f.replaceChildren();
+  [["Invoice", header.invoice_no], ["Date", showDate(invDate)], ["Vendor", header.vendor_name], ["PO", header.po_no]]
+    .forEach(([k, v]) => { const sp = document.createElement("span"); sp.append(k + ": "); const b = document.createElement("b"); b.textContent = v; sp.appendChild(b); f.appendChild(sp); });
+
+  // Score ring fills up and the number counts up to the passed checks
+  const RING = 326.73;
+  $("score").className = "score " + (failed.length ? "hold" : "ok");
+  $("scoreOf").textContent = "/ " + results.length;
+  $("scoreBar").style.transition = "none";
+  $("scoreBar").style.strokeDashoffset = RING;
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    $("scoreBar").style.transition = "";
+    $("scoreBar").style.strokeDashoffset = RING * (1 - passed.length / results.length);
+  }));
+  countUp($("scoreNum"), passed.length, 1300);
+
+  const body = $("resultRows");
+  body.replaceChildren();
+  results.forEach((r, i) => {
+    const ok = r.issues.length === 0;
+    const tr = document.createElement("tr");
+    tr.className = "row-in" + (ok ? "" : " fail");
+    tr.style.animationDelay = (0.6 + i * 0.18) + "s";
+    const c = document.createElement("td");
+    c.className = "check";
+    c.textContent = r.name;
+    (ok ? [r.okText] : r.issues).forEach(t => { const w = document.createElement("div"); w.className = "why"; w.textContent = t; c.appendChild(w); });    tr.appendChild(c);
+    const st = document.createElement("td");
+    st.className = "pass " + (ok ? "ok" : "no");
+    const badge = document.createElement("span");
+    badge.className = "badge";
+    badge.textContent = ok ? "✓ Pass" : "✗ Fail";
+    badge.style.animationDelay = (0.8 + i * 0.18) + "s";
+    st.appendChild(badge);
+    tr.appendChild(st);
+    tr.appendChild(cell(r.po));
+    tr.appendChild(cell(r.inv));
+    body.appendChild(tr);
+  });
+  const res = $("results");
+  res.style.display = "block";
+  res.classList.remove("show");
+  void res.offsetWidth; // restart the entrance animation on every Check
+  res.classList.add("show");
+  res.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function countUp(el, to, ms) {
+  if (reduceMotion) { el.textContent = to; return; }
+  const start = performance.now();
+  const step = now => {
+    const t = Math.min(1, (now - start) / ms);
+    el.textContent = Math.round(to * (1 - Math.pow(1 - t, 3)));
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function shake(el) {
+  el.classList.remove("shake");
+  void el.offsetWidth;
+  el.classList.add("shake");
+}
+
+// ---------- Page wiring ----------
+function setError(msg) {
+  const e = $("error");
+  e.textContent = msg || "";
+  e.style.display = msg ? "block" : "none";
+  if (msg) $("results").style.display = "none";
+}
+
+function fileType(name) {
+  if (/\.csv$/i.test(name)) return "csv";
+  if (/\.pdf$/i.test(name)) return "pdf";
+  if (/\.(jpe?g|png)$/i.test(name)) return "image";
+  return null;
+}
+
+// Any file → a document { header, items, how, name, text }
+async function readDocument(file, side, progress) {
+  const type = fileType(file.name);
+  if (type === "csv") return { ...recordsToDoc(toRecords(await file.text(), COLS[side], FIELDS[side].label), side), how: "CSV", name: file.name };
+  if (type === "image") return { ...await readByOcr([file], side, progress), how: "image (OCR)", name: file.name };
+  const pdf = await readPdf(file);
+  if (pdf.lines) return { ...parseDocument(pdf.lines, side), how: "PDF text", name: file.name };
+  return { ...await readByOcr(pdf.images, side, progress), how: "scanned PDF (OCR)", name: file.name };
+}
+
+async function handleFile(input, side) {
+  setError("");
+  const file = input.files[0];
+  const status = t => $(side + "Status").textContent = t;
+  const drop = $(side + "Drop");
+  if (!file) return;
+  drop.classList.remove("done", "reading");
+  $(side + "Name").textContent = "";
+  if (!fileType(file.name)) {
+    input.value = "";
+    status("");
+    return setError(`"${file.name}" is not a CSV, PDF or image file (JPG/PNG).`);
+  }
+  $(side + "Name").textContent = file.name;
+  drop.classList.add("reading");
+  status("Reading…");
+  try {
+    const doc = await readDocument(file, side, status);
+    renderReview(side, doc);
+    drop.classList.replace("reading", "done");
+    status(doc.how === "CSV"
+      ? `✓ Read ${doc.items.length} item row(s). See step 2.`
+      : `✓ Read ${doc.items.length} item line(s) from ${doc.how}. Please check step 2.`);
+  } catch (err) {
+    drop.classList.remove("reading");
+    $(side + "Name").textContent = "";
+    input.value = "";
+    status("");
+    setError(err.message);
+  }
+}
+
+for (const side of ["po", "inv"]) {
+  const drop = $(side + "Drop"), input = $(side + "File");
+  input.addEventListener("change", () => handleFile(input, side));
+  // Drag a file onto the zone as well as clicking it
+  ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, () => drop.classList.remove("over")));
+  drop.addEventListener("drop", e => {
+    e.preventDefault();
+    if (!e.dataTransfer.files.length) return;
+    input.files = e.dataTransfer.files;
+    handleFile(input, side);
+  });
+}
+
+$("checkBtn").addEventListener("click", () => {
+  setError("");
+  if (!loadedSides.po || !loadedSides.inv) return setError("Choose both a PO file and an invoice file first.");
+  try {
+    showResults(runChecks(collectSide("po"), collectSide("inv")));
+  } catch (err) {
+    setError(err.message);
+  }
+});
+
+// The rules section, built from the same lookup data the checks use
+(function showRules() {
+  const r = $("rules");
+  const table = (head, rows) => {
+    const t = document.createElement("table");
+    const hr = t.createTHead().insertRow();
+    head.forEach(h => { const th = document.createElement("th"); th.textContent = h; hr.appendChild(th); });
+    const tb = t.createTBody();
+    rows.forEach(row => { const tr = tb.insertRow(); row.forEach(v => tr.insertCell().textContent = v); });
+    return t;
+  };
+  r.appendChild(table(["GST rates", "Valid from", "Valid to"],
+    GST_RATES.map(s => [s.rates.map(x => x + "%").join(", "), showDate(s.from), s.to ? showDate(s.to) : "—"])));
+})();
+
+// ---------- Login (Supabase Auth) ----------
+// The publishable key is meant to be public; Supabase checks the email and password on its own server.
+const SUPABASE_URL = "https://mbormqyxqiwmbceufmmn.supabase.co";
+const SUPABASE_KEY = "sb_publishable_nEgw9AKlQAXCazrC6UtdfQ_yumbBymq";
+
+function showLoginError(msg) {
+  const e = $("loginError");
+  e.textContent = msg || "";
+  e.style.display = msg ? "block" : "none";
+  if (msg) shake($("login"));
+}
+
+function showSignedIn(user) {
+  $("login").hidden = !!user;
+  $("app").hidden = !user;
+  $("userEmail").textContent = user ? user.email : "";
+}
+
+(async function startLogin() {
+  if (!window.supabase) {
+    showLoginError("Could not load the sign-in service. Check your internet connection and refresh the page.");
+    $("signInBtn").disabled = true;
+    return;
+  }
+  const auth = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY).auth;
+
+  const { data } = await auth.getSession();
+  showSignedIn(data.session?.user);
+  auth.onAuthStateChange((_event, session) => showSignedIn(session?.user));
+
+  $("loginForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    showLoginError("");
+    $("signInBtn").disabled = true;
+    $("signInBtn").textContent = "Signing in…";
+    const { error } = await auth.signInWithPassword({ email: $("email").value.trim(), password: $("password").value });
+    $("signInBtn").disabled = false;
+    $("signInBtn").textContent = "Sign in";
+    if (error) showLoginError(/invalid login/i.test(error.message) ? "Wrong email or password." : error.message);
+    else $("password").value = "";
+  });
+
+  $("signOutBtn").addEventListener("click", () => auth.signOut());
+})();
