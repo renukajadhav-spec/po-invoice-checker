@@ -273,6 +273,17 @@
   .detail-line .why { font-size: 12px; color: var(--muted); margin-left: 18px; }
   .detail-line.fail .why { color: var(--no); }
   .recheck-btn { white-space: nowrap; color: var(--accent); border-color: rgba(95, 212, 196, .45); }
+
+  /* Approval column */
+  td.approval { min-width: 150px; }
+  td.approval button { margin: 0 6px 6px 0; white-space: nowrap; }
+  td.approval .edit { margin-bottom: 6px; font-size: 13px; }
+  .approve-btn { color: var(--ok); border-color: rgba(95, 212, 196, .45); }
+  .reject-btn { color: var(--no); border-color: rgba(255, 138, 128, .45); }
+  .change-btn { margin-top: 6px; }
+  .decision { font-weight: 800; }
+  .decision.ok { color: var(--ok); }
+  .decision.no { color: var(--no); }
   td .sub { font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 4px; white-space: normal; }
 
   /* Re-check banner in step 2 */

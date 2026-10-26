@@ -40,3 +40,9 @@ All test data is fake. The sample files are in [`samples/`](../samples/).
 | 34 | Cancel re-check | Re-check → Cancel re-check → Check | Banner gone; new row is a normal check (no "Re-check of") | | |
 | 35 | Older row | Row saved before Re-check existed | "—" in the Re-check column, no button | | |
 | 36 | CSV with re-checks | Download CSV after test 32 | ID and Re-check of ID columns link the two rows | | |
+| 37 | Approve | Ready row → ✓ Approve | "✓ Approved by <email> · <time>"; same in Supabase | | |
+| 38 | Reject, no reason | Ready row → ✗ Reject → Confirm reject with empty box | Red box, not saved | | |
+| 39 | Reject with reason | Type a reason → Confirm reject | "✗ Rejected", by, time and "Reason: …" | | |
+| 40 | Change decision | Change → Approve on a rejected row | Now "✓ Approved"; the reject is replaced | | |
+| 41 | Hold row | Look at a Hold row's Approval column | "Fix and re-check first", no buttons | | |
+| 42 | CSV approval | Download CSV after tests 37–40 | Approval, Approved by, Approved on, Approval note filled | | |

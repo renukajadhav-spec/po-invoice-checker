@@ -881,7 +881,10 @@ function showLoginError(msg) {
   if (msg) shake($("login"));
 }
 
+let currentUser = null;
+
 function showSignedIn(user) {
+  currentUser = user || null;
   $("login").hidden = !!user;
   $("app").hidden = !user;
   $("userEmail").textContent = user ? user.email : "";
@@ -998,6 +1001,15 @@ function endRecheck() {
 
 $("recheckCancel").addEventListener("click", endRecheck);
 
+function smallButton(text, cls, onClick) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "small " + cls;
+  b.textContent = text;
+  b.addEventListener("click", onClick);
+  return b;
+}
+
 // The Re-check column: a button when the PO and invoice were saved, otherwise a dash
 function recheckCell(h) {
   const td = document.createElement("td");
@@ -1007,14 +1019,79 @@ function recheckCell(h) {
     td.title = "Older check: the PO and invoice were not saved, so it can't be re-checked";
     return td;
   }
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "small recheck-btn";
-  btn.textContent = "↻ Re-check";
+  const btn = smallButton("↻ Re-check", "recheck-btn", e => { e.stopPropagation(); startRecheck(h); });
   btn.title = "Load this PO and invoice into step 2 to correct or upload the corrected file";
-  btn.addEventListener("click", e => { e.stopPropagation(); startRecheck(h); });
   td.appendChild(btn);
   return td;
+}
+
+// ---------- Approval: any signed-in user can approve or reject a Ready check ----------
+// The Approval column: buttons while waiting, the decision once made, or a note for Hold rows
+function approvalCell(h) {
+  const td = document.createElement("td");
+  td.className = "approval";
+  td.addEventListener("click", e => e.stopPropagation()); // clicks here don't open the row details
+  if (h.verdict === "Hold") {
+    td.classList.add("empty");
+    td.textContent = "Fix and re-check first";
+  } else if (h.approval) showDecision(td, h);
+  else showDecideButtons(td, h);
+  return td;
+}
+
+function showDecision(td, h) {
+  td.replaceChildren();
+  const ok = h.approval === "Approved";
+  const d = document.createElement("div");
+  d.className = "decision " + (ok ? "ok" : "no");
+  d.textContent = ok ? "✓ Approved" : "✗ Rejected";
+  td.appendChild(d);
+  subLine(td, `by ${h.approved_by_email} · ${showTime(h.approved_at)}`);
+  if (h.approval_note) subLine(td, `Reason: ${h.approval_note}`);
+  td.appendChild(smallButton("Change", "change-btn", () => showDecideButtons(td, h)));
+}
+
+function showDecideButtons(td, h) {
+  td.replaceChildren();
+  td.append(
+    smallButton("✓ Approve", "approve-btn", () => decide(td, h, "Approved", "")),
+    smallButton("✗ Reject", "reject-btn", () => askReason(td, h))
+  );
+  if (h.approval) td.appendChild(smallButton("Cancel", "", () => showDecision(td, h)));
+}
+
+// Reject needs a reason: a small box in the cell, refused while empty
+function askReason(td, h) {
+  td.replaceChildren();
+  const inp = document.createElement("input");
+  inp.className = "edit";
+  inp.placeholder = "Reason for rejecting";
+  inp.setAttribute("aria-label", "Reason for rejecting");
+  const confirm = smallButton("Confirm reject", "reject-btn", () => {
+    if (!inp.value.trim()) { inp.classList.add("missing"); inp.focus(); return; }
+    decide(td, h, "Rejected", inp.value.trim());
+  });
+  inp.addEventListener("keydown", e => { if (e.key === "Enter") confirm.click(); });
+  td.append(inp, confirm, smallButton("Cancel", "", () => h.approval ? showDecision(td, h) : showDecideButtons(td, h)));
+  inp.focus();
+}
+
+async function decide(td, h, approval, note) {
+  td.querySelectorAll("button").forEach(b => b.disabled = true);
+  const { data, error } = await db.from("check_history").update({
+    approval,
+    approval_note: note || null,
+    approved_by: currentUser.id,
+    approved_by_email: currentUser.email,
+    approved_at: new Date().toISOString()
+  }).eq("id", h.id).select("id");
+  // No error but no row changed means the security rules refused it
+  if (error || !data.length) {
+    td.querySelectorAll("button").forEach(b => b.disabled = false);
+    subLine(td, "Could not save: " + (error ? error.message : "not allowed for this check"));
+    return;
+  }
+  refreshHistory();
 }
 
 // Each check with ✓ / ✗ and its reasons, shown under a clicked history row
@@ -1022,7 +1099,7 @@ function detailRow(h) {
   const tr = document.createElement("tr");
   tr.className = "detail";
   const td = tr.insertCell();
-  td.colSpan = 8;
+  td.colSpan = 9;
   if (!h.details) {
     td.className = "empty";
     td.textContent = "Details were not saved for this older check.";
@@ -1049,7 +1126,7 @@ async function loadHistory() {
   const message = text => {
     body.replaceChildren();
     const td = body.insertRow().insertCell();
-    td.colSpan = 8;
+    td.colSpan = 9;
     td.className = "empty";
     td.textContent = text;
   };
@@ -1099,6 +1176,7 @@ async function loadHistory() {
     tr.appendChild(st);
     tr.appendChild(cell(h.failed_checks.length ? h.failed_checks : ["—"]));
     tr.appendChild(cell([h.checked_by_email]));
+    tr.appendChild(approvalCell(h));
     tr.appendChild(recheckCell(h));
   });
 }
@@ -1120,12 +1198,13 @@ async function downloadHistory() {
   const note = $("historyNote");
   const { data, error } = await historyQuery(1000);
   if (error) { note.textContent = "Could not download the history: " + error.message; return; }
-  const head = ["ID", "Checked on", "PO no.", "Invoice no.", "Invoice date", "Vendor", "Passed", "Total", "Verdict", "Failed checks", "Reasons", "Checked by", "Re-check of ID"];
+  const head = ["ID", "Checked on", "PO no.", "Invoice no.", "Invoice date", "Vendor", "Passed", "Total", "Verdict", "Failed checks", "Reasons", "Checked by", "Re-check of ID", "Approval", "Approved by", "Approved on", "Approval note"];
   const rows = data.map(h => [
     h.id, showTime(h.checked_at), h.po_no, h.invoice_no, showDate(h.invoice_date), h.vendor_name, h.passed, h.total, h.verdict,
     h.failed_checks.join("; "),
     (h.details || []).flatMap(d => d.issues.map(t => `${d.name}: ${t}`)).join("; "),
-    h.checked_by_email, h.rechecked_from
+    h.checked_by_email, h.rechecked_from,
+    h.approval, h.approved_by_email, h.approved_at ? showTime(h.approved_at) : "", h.approval_note
   ]);
   // "\uFEFF" tells Excel the file is UTF-8, so ₹ and names show correctly
   const text = "\uFEFF" + [head, ...rows].map(r => r.map(csvCell).join(",")).join("\r\n");

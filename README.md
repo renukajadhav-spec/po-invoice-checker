@@ -29,6 +29,7 @@ Live link: https://renukajadhav-spec.github.io/po-invoice-checker/
 5. Every check is saved to **History** (step 5), which all signed-in users can see. Search it, filter Hold only, click a row for the reasons, or **Download CSV** for Excel.
 6. **Print / Save as PDF** a result, and see the **Dashboard** for any date range.
 7. **Re-check** a Hold from History once the PO or invoice is corrected.
+8. **Approve or reject** a Ready check in the History **Approval** column (Reject needs a reason).
 
 The 7 checks and the CSV column headings are in [docs/requirements.md](docs/requirements.md).
 Fake test files: `samples/po-1001.pdf` + `samples/invoice-501.pdf` (expect 7/7 ✓) and `samples/po-1002.pdf` + `samples/invoice-m-207.png` (expect ✗ over-billing, qty 13 vs 12).
@@ -51,7 +52,7 @@ Sign-in and check history use the Supabase project **`po-invoice-checker`**.
 ## History table
 Check history is kept in the Supabase table `check_history`.
 - **Set up once:** Supabase → SQL Editor → New query → paste [docs/check_history.sql](docs/check_history.sql) → **Run**.
-- **Already set up earlier?** Also run, once each: [docs/check_history_add_details.sql](docs/check_history_add_details.sql) (reasons) and [docs/check_history_add_recheck.sql](docs/check_history_add_recheck.sql) (Re-check).
+- **Already set up earlier?** Also run, once each: [docs/check_history_add_details.sql](docs/check_history_add_details.sql) (reasons), [docs/check_history_add_recheck.sql](docs/check_history_add_recheck.sql) (Re-check) and [docs/check_history_add_approval.sql](docs/check_history_add_approval.sql) (Approval).
 - **See it:** Supabase → Table Editor → `check_history`, or step 5 in the app.
 - Row Level Security lets signed-in users read all rows and add their own; nobody can edit or delete rows from the app.
 

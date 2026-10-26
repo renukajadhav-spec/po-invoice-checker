@@ -17,12 +17,19 @@ create table public.check_history (
   details          jsonb,  -- each check's name and reasons: [{"name": "Items", "issues": ["..."]}]
   po_data          jsonb,  -- the PO as reviewed in step 2: { header, items }
   invoice_data     jsonb,  -- the invoice as reviewed in step 2: { header, items }
-  rechecked_from   bigint references public.check_history (id)  -- the row this check re-checks
+  rechecked_from   bigint references public.check_history (id),  -- the row this check re-checks
+  approval          text check (approval in ('Approved', 'Rejected')),  -- empty = waiting
+  approved_by       uuid references auth.users (id),
+  approved_by_email text,
+  approved_at       timestamptz,
+  approval_note     text  -- reason, required for Rejected
 );
 
 -- Open the table to signed-in users only (new tables are not exposed automatically).
--- No update or delete is granted.
+-- Rows can be read and added; only the 5 approval columns can be changed; nothing can be deleted.
 grant select, insert on public.check_history to authenticated;
+grant update (approval, approved_by, approved_by_email, approved_at, approval_note)
+  on public.check_history to authenticated;
 
 -- Row Level Security: only the rules below are allowed
 alter table public.check_history enable row level security;
@@ -39,4 +46,16 @@ create policy "Signed-in users add their own checks"
   to authenticated
   with check (checked_by = auth.uid());
 
--- No update or delete rule: history cannot be changed or removed from the app
+-- Signed-in users can approve or reject Ready checks, only as themselves; a Reject needs a reason
+create policy "Signed-in users decide on Ready checks"
+  on public.check_history for update
+  to authenticated
+  using (verdict = 'Ready for manager approval')
+  with check (
+    verdict = 'Ready for manager approval'
+    and approved_by = auth.uid()
+    and (approval = 'Approved'
+         or (approval = 'Rejected' and length(trim(coalesce(approval_note, ''))) > 0))
+  );
+
+-- No delete rule: history cannot be removed from the app
