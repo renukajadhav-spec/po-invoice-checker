@@ -342,28 +342,47 @@
   }
   .userbar b { color: var(--text); }
 
-  /* Next step guide bar, fixed at the bottom of the screen */
+  /* Next step guide bar, fixed at the bottom of the screen: violet so it stands out from the teal page */
   .userbar .buttons { display: flex; gap: 6px; }
   .guide {
     position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 50;
-    width: min(760px, calc(100% - 32px));
-    display: flex; align-items: center; gap: 12px; padding: 12px 10px 12px 18px;
-    border-radius: 16px; font-size: 14px;
-    background: rgba(9, 38, 35, .94); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
-    border: 1px solid rgba(95, 212, 196, .45);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, .5), 0 0 24px rgba(95, 212, 196, .15);
+    width: min(800px, calc(100% - 32px));
+    display: flex; align-items: center; gap: 12px; padding: 12px 10px 12px 16px;
+    border-radius: 16px; font-size: 14px; color: #fff;
+    background: linear-gradient(135deg, #7C3AED, #5B21B6);
+    border: 1px solid #C4B5FD;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, .5), 0 0 26px rgba(139, 92, 246, .55);
+    animation: guideGlow 2.6s ease-in-out infinite;
   }
   .guide-text { flex: 1; }
-  .guide b { color: var(--accent); margin-right: 4px; white-space: nowrap; }
-  .guide.warn { border-color: rgba(255, 138, 128, .55); }
-  .guide.warn b { color: var(--no); }
-  .guide #guideGo { white-space: nowrap; color: var(--accent); border-color: rgba(95, 212, 196, .45); }
-  .guide-x { background: none; border: 0; color: var(--muted); font-size: 20px; line-height: 1; padding: 2px 6px; }
-  .guide-x:hover { color: var(--text); box-shadow: none; }
-  .guide.changed { animation: guideIn .45s cubic-bezier(.2, .8, .2, 1); }
+  .guide b {
+    display: inline-block; margin-right: 6px; padding: 2px 9px; border-radius: 99px; white-space: nowrap;
+    background: #fff; color: #5B21B6; font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
+  }
+  .guide.warn { border-color: #FCA5A5; box-shadow: 0 12px 40px rgba(0, 0, 0, .5), 0 0 0 2px #F87171; animation: none; }
+  .guide.warn b { background: #FEE2E2; color: #B91C1C; }
+  .guide-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+  .guide-buttons button { white-space: nowrap; }
+  .guide #guideGo { background: transparent; color: #fff; border-color: rgba(255, 255, 255, .7); }
+  .guide #guideCheck { background: #fff; color: #5B21B6; border-color: #fff; font-weight: 700; }
+  .guide-buttons button:hover { box-shadow: 0 0 16px rgba(255, 255, 255, .45); }
+  .guide-x { background: none; border: 0; color: #DDD6FE; font-size: 20px; line-height: 1; padding: 2px 6px; }
+  .guide-x:hover { color: #fff; box-shadow: none; }
+  .guide.changed { animation: guideIn .45s cubic-bezier(.2, .8, .2, 1), guideGlow 2.6s .45s ease-in-out infinite; }
+  .guide.warn.changed { animation: guideIn .45s cubic-bezier(.2, .8, .2, 1); }
   @keyframes guideIn {
     from { opacity: 0; transform: translate(-50%, 18px); }
     to   { opacity: 1; transform: translate(-50%, 0); }
+  }
+  @keyframes guideGlow {
+    0%, 100% { box-shadow: 0 12px 40px rgba(0, 0, 0, .5), 0 0 22px rgba(139, 92, 246, .45); }
+    50%      { box-shadow: 0 12px 40px rgba(0, 0, 0, .5), 0 0 40px rgba(167, 139, 250, .85); }
+  }
+  /* The Check button pulses when the guide jumps to it */
+  #checkBtn.pulse { animation: checkPulse .9s ease-out 3; }
+  @keyframes checkPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(95, 212, 196, .9), 0 0 24px rgba(95, 212, 196, .45); }
+    100% { box-shadow: 0 0 0 18px rgba(95, 212, 196, 0), 0 0 24px rgba(95, 212, 196, .45); }
   }
   @media (max-width: 640px) {
     .guide { flex-wrap: wrap; bottom: 10px; }

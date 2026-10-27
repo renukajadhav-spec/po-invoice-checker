@@ -160,7 +160,10 @@
   <!-- Next step guide: fixed at the bottom of the screen, changes as the user goes -->
   <div class="guide" id="guide" role="status" aria-live="polite">
     <div class="guide-text"><b id="guideStep"></b> <span id="guideText"></span></div>
-    <button type="button" class="small" id="guideGo"></button>
+    <div class="guide-buttons">
+      <button type="button" class="small" id="guideGo"></button>
+      <button type="button" class="small" id="guideCheck" hidden>✔ Go to Check</button>
+    </div>
     <button type="button" class="guide-x" id="guideClose" aria-label="Hide the guide" title="Hide the guide">×</button>
   </div>
   </div>
