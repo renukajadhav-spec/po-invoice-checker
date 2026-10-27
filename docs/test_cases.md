@@ -61,3 +61,6 @@ All test data is fake. The sample files are in [`samples/`](../samples/).
 | 54 | Guide, re-check | ↻ Re-check a row | "Re-check · Correct the boxes…" | | |
 | 55 | Hide / show guide | Click × on the bar, then **Show guide** in the top bar | Bar hides, then comes back | | |
 | 56 | Guide not printed | Print / Save as PDF | No guide bar on the page | | |
+| 58 | Load more | History with more than 50 checks | 50 rows + **Load more**; click → next 50 added below; button gone at the end | | |
+| 59 | Load more + search | Search or tick Hold only, then Load more | Only matching rows are added; a new search starts again from the newest 50 | | |
+| 60 | Load more + approve | Approve a row that came from Load more | Saved; the loaded rows stay on screen | | |

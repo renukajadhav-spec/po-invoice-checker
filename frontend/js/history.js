@@ -41,14 +41,14 @@ async function findEarlierCheck(poNo, invoiceNo) {
 const showTime = iso =>new Date(iso).toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short" });
 
 function refreshHistory() {
-  loadHistory();
+  loadHistory("keep"); // after a save or approval, keep the rows already loaded
   fillDashDates(); // so "This month" stays right if the page was left open overnight
   loadDashboard();
 }
 
-// History rows matching the search box and the Hold only tick, newest first
-function historyQuery(limit) {
-  let q = db.from("check_history").select("*").order("checked_at", { ascending: false }).limit(limit);
+// History rows matching the search box and the Hold only tick, newest first (caller adds .range or .limit)
+function historyQuery() {
+  let q = db.from("check_history").select("*").order("checked_at", { ascending: false });
   // Keep only characters a PO or invoice number can have, so the search text can't break the query
   const term = $("historySearch").value.replace(/[^A-Za-z0-9\/\-.]/g, "");
   if (term) q = q.or(`po_no.ilike.*${term}*,invoice_no.ilike.*${term}*`);
@@ -213,23 +213,37 @@ function detailRow(h) {
   return tr;
 }
 
-// The latest 50 checks that match the search, newest first. A newer search replaces an older one still loading.
-let historyAsk = 0;
-async function loadHistory() {
+// Checks that match the search, newest first, 50 at a time. A newer search replaces an older one still loading.
+// mode: "reset" = the newest 50 (new search), "more" = add the next 50, "keep" = reload as many as are shown
+const HISTORY_PAGE = 50;
+let historyAsk = 0, historyShown = 0;
+async function loadHistory(mode = "reset") {
   const ask = ++historyAsk;
-  const body = $("historyRows");
+  const body = $("historyRows"), moreBtn = $("historyMore");
+  const more = mode === "more";
   const message = text => {
     body.replaceChildren();
     const td = body.insertRow().insertCell();
     td.colSpan = 6;
     td.className = "empty";
     td.textContent = text;
+    moreBtn.hidden = true;
   };
-  const { data, error } = await historyQuery(50);
+  const from = more ? historyShown : 0;
+  const count = mode === "keep" ? Math.max(HISTORY_PAGE, historyShown) : HISTORY_PAGE;
+  moreBtn.disabled = true;
+  moreBtn.textContent = more ? "Loading…" : "Load more";
+  const { data, error } = await historyQuery().range(from, from + count - 1);
   if (ask !== historyAsk) return;
-  if (error) return message("Could not load the history: " + error.message);
+  moreBtn.disabled = false;
+  moreBtn.textContent = "Load more";
+  if (error) {
+    if (more) { $("historyMsg").textContent = "Could not load more: " + error.message; return; }
+    return message("Could not load the history: " + error.message);
+  }
   const filtered = $("historySearch").value.trim() || $("holdOnly").checked;
-  if (!data.length) return message(filtered ? "No checks match your search." : "No checks saved yet.");
+  if (!data.length && !more) return message(filtered ? "No checks match your search." : "No checks saved yet.");
+  if (!data.length) { moreBtn.hidden = true; return; } // nothing more to add
 
   // Links between re-checks: the date of each original, and the latest re-check of each shown row
   const fromIds = data.map(h => h.rechecked_from).filter(Boolean);
@@ -241,7 +255,9 @@ async function loadHistory() {
   const origTime = new Map((orig.data || []).map(o => [o.id, o.checked_at]));
   const latest = new Map((later.data || []).map(r => [r.rechecked_from, r])); // oldest first, so the newest wins
 
-  body.replaceChildren();
+  if (!more) body.replaceChildren();
+  historyShown = from + data.length;
+  moreBtn.hidden = data.length < count; // a short page means there are no more
   data.forEach(h => {
     const tr = body.insertRow();
     const hold = h.verdict === "Hold";
@@ -280,7 +296,8 @@ async function loadHistory() {
 
 let searchTimer;
 $("historySearch").addEventListener("input", () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadHistory, 300); });
-$("holdOnly").addEventListener("change", loadHistory);
+$("holdOnly").addEventListener("change", () => loadHistory());
+$("historyMore").addEventListener("click", () => loadHistory("more"));
 $("historyRefresh").addEventListener("click", refreshHistory);
 
 // ---------- Download history as an Excel file (.xlsx) ----------
@@ -319,7 +336,7 @@ async function downloadHistory() {
     msg.textContent = "Could not load the Excel maker. Check your internet connection and try again.";
     return;
   }
-  const { data, error } = await historyQuery(1000);
+  const { data, error } = await historyQuery().limit(1000);
   if (error) { msg.textContent = "Could not download the history: " + error.message; return; }
 
   const rows = [EXCEL_COLUMNS.map(c => c[0])].concat(data.map(h => EXCEL_COLUMNS.map(([, , get]) => {

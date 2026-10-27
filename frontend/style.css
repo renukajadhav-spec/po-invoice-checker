@@ -287,6 +287,9 @@
   td .sub { font-size: 12px; font-weight: 400; color: var(--muted); margin-top: 4px; white-space: normal; }
   td .sub.failed { color: var(--no); margin-top: 3px; }
 
+  .loadmore { text-align: center; margin-top: 12px; }
+  .loadmore button { padding: 6px 22px; }
+
   /* History: compact so all 6 columns fit one screen */
   table.history { font-size: 13px; }
   table.history th, table.history td { padding: 9px 6px; }
