@@ -64,3 +64,6 @@ All test data is fake. The sample files are in [`samples/`](../samples/).
 | 58 | Load more | History with more than 50 checks | 50 rows + **Load more**; click → next 50 added below; button gone at the end | | |
 | 59 | Load more + search | Search or tick Hold only, then Load more | Only matching rows are added; a new search starts again from the newest 50 | | |
 | 60 | Load more + approve | Approve a row that came from Load more | Saved; the loaded rows stay on screen | | |
+| 61 | GSTINs from an image | Choose `test-set/6-buyer-gstin-mismatch-image` PO + invoice (PNG) | Amber note at the top of each side; both GSTIN boxes dashed amber with "⚠ Read from an image…" | | |
+| 62 | GSTIN highlight goes away | Click into a highlighted GSTIN and out, or edit it | That box goes back to normal | | |
+| 63 | No highlight for PDF text | Choose `test-set/1-matched` PDFs | No amber note, no highlight | | |

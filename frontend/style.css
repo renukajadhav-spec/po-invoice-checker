@@ -194,6 +194,13 @@
     0%, 100% { box-shadow: 0 0 0 0 rgba(255, 138, 128, 0); }
     50%      { box-shadow: 0 0 0 4px rgba(255, 138, 128, .22); }
   }
+  /* GSTINs read by OCR: look again before checking */
+  .ocr-warn {
+    margin-bottom: 10px; padding: 8px 12px; border-radius: 10px; font-size: 13px; font-weight: 600;
+    color: var(--warn); background: var(--warn-soft); border: 1px solid rgba(240, 169, 90, .4);
+  }
+  .edit.verify { border: 2px dashed var(--warn); background: var(--warn-soft); }
+  .verify-hint { margin-top: 3px; font-size: 11px; font-weight: 600; color: var(--warn); }
   table.items td { padding: 4px; border-bottom: none; }
   table.items th { padding: 4px; }
   table.items .edit { min-width: 70px; }

@@ -25,6 +25,19 @@ function addItemRow(tbody, side, item = {}) {
   tr.insertCell().appendChild(del);
 }
 
+// A GSTIN read by OCR: amber dashed box and a hint until the user has looked at it (typed in it, or clicked in and out).
+// Only a reading aid: OCR can mix up O/0, I/1, S/5, B/8, and one wrong letter changes the Vendor/Buyer result.
+function markToVerify(wrap, inp) {
+  inp.classList.add("verify");
+  const hint = document.createElement("div");
+  hint.className = "verify-hint";
+  hint.textContent = "⚠ Read from an image — compare with the picture";
+  wrap.appendChild(hint);
+  const done = () => { inp.classList.remove("verify"); hint.remove(); };
+  inp.addEventListener("input", done, { once: true });
+  inp.addEventListener("blur", done, { once: true });
+}
+
 function renderReview(side, doc) {
   const box = $("review-" + side), f = FIELDS[side];
   box.replaceChildren();
@@ -36,13 +49,23 @@ function renderReview(side, doc) {
   how.textContent = `Read from ${doc.how}: ${doc.name}`;
   box.append(h, how);
 
+  const ocr = /OCR/.test(doc.how || "");
+  if (ocr) {
+    const warn = document.createElement("div");
+    warn.className = "ocr-warn";
+    warn.textContent = "⚠ Read from an image: OCR can misread letters (O/0, I/1, S/5, B/8). Check the highlighted GSTINs against the picture.";
+    box.appendChild(warn);
+  }
+
   const fields = document.createElement("div");
   fields.className = "fields";
   f.header.forEach(k => {
     const wrap = document.createElement("div");
     const lab = document.createElement("label");
     lab.textContent = NICE[k] + (OPTIONAL.includes(k) ? " (optional)" : "");
-    wrap.append(lab, makeInput(k, doc.header[k]));
+    const inp = makeInput(k, doc.header[k]);
+    wrap.append(lab, inp);
+    if (ocr && k.endsWith("_gstin")) markToVerify(wrap, inp);
     fields.appendChild(wrap);
   });
   box.appendChild(fields);
