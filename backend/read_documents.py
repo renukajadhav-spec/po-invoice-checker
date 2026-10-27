@@ -1,7 +1,7 @@
 """Reads a PO or invoice file and returns its fields.
 
 PLACEHOLDER: outlines only. Today this is done in the browser by
-readDocument / readPdf / readByOcr / parseDocument in frontend/app.js.
+readDocument / readPdf / readByOcr / parseDocument in frontend/js/reading.js.
 """
 
 

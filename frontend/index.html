@@ -171,6 +171,14 @@
   <footer>The app flags and holds. The manager approves.</footer>
 </main>
 
-<script src="app.js"></script>
+<!-- In this order: later files use earlier ones; app.js starts sign-in, so it comes last -->
+<script src="js/core.js"></script>
+<script src="js/reading.js"></script>
+<script src="js/review.js"></script>
+<script src="js/checks.js"></script>
+<script src="js/guide.js"></script>
+<script src="js/history.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/app.js"></script>
 </body>
 </html>

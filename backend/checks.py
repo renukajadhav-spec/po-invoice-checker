@@ -1,6 +1,6 @@
 """The 6 PO vs invoice checks.
 
-PLACEHOLDER: outlines only. Today the checks run in runChecks() in frontend/app.js.
+PLACEHOLDER: outlines only. Today the checks run in runChecks() in frontend/js/checks.js.
 The rules for each check are in docs/requirements.md.
 
 po and inv are lists of lines. Each line is a dict with the header fields

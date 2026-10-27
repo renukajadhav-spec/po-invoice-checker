@@ -11,7 +11,8 @@ Live link: https://renukajadhav-spec.github.io/po-invoice-checker/
 | Path | What it holds |
 |---|---|
 | `index.html` | Sends visitors on to `frontend/`, so the live link keeps working |
-| `frontend/` | The app: `index.html` (page layout), `style.css` (looks), `app.js` (logic, reading and the 7 checks) |
+| `frontend/` | The app: `index.html` (page layout), `style.css` (looks), `js/` (logic) |
+| `frontend/js/` | `core.js` (GST rates, helpers), `reading.js` (CSV, PDF, OCR), `review.js` (step 2), `checks.js` (the 7 checks), `guide.js` (next step bar), `history.js` (history, re-check, approval, Excel), `dashboard.js`, `app.js` (page wiring, sign-in) |
 | `backend/` | Python outlines for a future server: `main.py`, `read_documents.py`, `checks.py`, `database.py`. Not used yet |
 | `data/gst_rates.csv` | GST rate slabs with valid-from / valid-to dates |
 | `docs/` | `requirements.md` (what the app must do), `test_cases.md` (what to test), `check_history.sql` (creates the history table) |

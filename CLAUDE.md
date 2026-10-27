@@ -16,8 +16,8 @@ Rules for Claude Code in this project.
 
 ## The project
 - `index.html` (main folder): only redirects to `frontend/` so the GitHub Pages link keeps working. Don't put app code in it.
-- `frontend/`: the app that runs today (index.html + style.css + app.js). Checks run in the browser.
+- `frontend/`: the app that runs today (index.html + style.css + `js/`). Checks run in the browser. `js/` files, loaded in this order: `core.js` (lookup data, helpers), `reading.js` (CSV/PDF/OCR), `review.js` (step 2), `checks.js` (the 7 checks, results), `guide.js` (next step bar), `history.js` (history, re-check, approval, Excel), `dashboard.js`, `app.js` (page wiring, login; last).
 - `backend/`: Python outlines only. Not used yet.
-- `data/gst_rates.csv`: GST rate slabs. The same rates are also in `GST_RATES` in `frontend/app.js`; change both together.
+- `data/gst_rates.csv`: GST rate slabs. The same rates are also in `GST_RATES` in `frontend/js/core.js`; change both together.
 - `docs/requirements.md`: what the app must do. `docs/test_cases.md`: what to test.
 - Checks compare the PO with the invoice only. Do not add vendor-list, company or GSTIN check-digit checks.

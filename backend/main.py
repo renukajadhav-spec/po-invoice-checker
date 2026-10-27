@@ -1,6 +1,6 @@
 """Entry point for the future web server.
 
-PLACEHOLDER: nothing runs yet. Today the checks run in the browser (frontend/app.js).
+PLACEHOLDER: nothing runs yet. Today the checks run in the browser (frontend/js/).
 
 Later this file will:
 - start a small web server (for example FastAPI)
